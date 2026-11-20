@@ -199,6 +199,23 @@ def get_analysis(job_id: str):
     return json.loads(_file(job_id, "analysis.json").read_text())
 
 
+class Roster(BaseModel):
+    teams: list[dict]  # [{"name": "UConn", "players": {"24": "Braylon Mullins", ...}}, {...}]
+
+
+@app.put("/api/jobs/{job_id}/roster")
+def set_roster(job_id: str, roster: Roster):
+    """Both teams' jersey numbers and names: rejects misread numbers, fixes teams, names players.
+    Which colour team is which roster is worked out from the numbers read."""
+    t = roster.teams
+    if len(t) != 2 or not all(isinstance(x.get("name"), str) and isinstance(x.get("players"), dict) and x["players"]
+                              and all(str(k).isdigit() and isinstance(v, str) for k, v in x["players"].items()) for x in t):
+        raise HTTPException(400, 'need 2 teams: {"name": str, "players": {"<jersey number>": "<name>"}}')
+    (db.DATA_DIR / _job(job_id)["id"] / "roster.json").write_text(
+        json.dumps({"teams": [{"name": x["name"], "players": {str(k): v for k, v in x["players"].items()}} for x in t]}))
+    return start_tracking(job_id, RunRequest(start_stage="identities"))
+
+
 class Calibration(BaseModel):
     image_points: list[list[float]]
     world_points: list[list[float]]

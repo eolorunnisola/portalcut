@@ -14,8 +14,8 @@ from portalcut import db, track
 from portalcut.config import Config
 
 log = logging.getLogger("portalcut.pipeline")
-STAGES = ("tracking", "features", "numbers", "identities", "annotating", "analytics", "analysis")
-INVALIDATED_BY_TRACKING = ("numbers.json", "identities.json", "selection.json", "player.npz", "events.json",
+STAGES = ("tracking", "live", "features", "numbers", "identities", "annotating", "analytics", "analysis")
+INVALIDATED_BY_TRACKING = ("live.json", "numbers.json", "identities.json", "selection.json", "player.npz", "events.json",
                            "annotated.mp4", "analytics.json", "analysis.json")
 
 
@@ -55,6 +55,12 @@ def _run(job_id: str, job_dir: Path, start_stage: str) -> None:
                 for key in ("selection", "plays", "numbers", "identities", "annotated", "analytics", "analysis"):
                     meta.pop(key, None)
                 meta["tracking"] = res["stats"]
+            elif stage == "live":
+                from portalcut import live
+                tr = track.load(job_dir / "tracks.npz")
+                frames = live.live_frames(tr, h, cfg.detect_fps)
+                meta["live"] = live.summary(tr, h, cfg.detect_fps)
+                (job_dir / "live.json").write_text(json.dumps({"frames": sorted(frames), "summary": meta["live"]}))
             elif stage == "features":
                 from portalcut import reid
                 meta["features"] = reid.build_features(job_dir, w, h, cfg.detect_fps, progress)
@@ -71,9 +77,11 @@ def _run(job_id: str, job_dir: Path, start_stage: str) -> None:
                 meta["identities"] = identity.build(job_dir)
             elif stage == "annotating":
                 from portalcut import annotate
+                lf = job_dir / "live.json"
                 meta["annotated"] = annotate.render(proxy, w, h, track.load(job_dir / "tracks.npz"),
                                                     _identities(job_dir), cfg.detect_fps, job_dir / "annotated.mp4",
-                                                    out_fps=cfg.annotate_fps, on_progress=progress)
+                                                    out_fps=cfg.annotate_fps, on_progress=progress,
+                                                    live_frames=set(json.loads(lf.read_text())["frames"]) if lf.exists() else None)
             elif stage == "analytics":
                 from portalcut import analytics
                 a = analytics.run(job_dir, meta)

@@ -87,6 +87,7 @@ def _player(pid: str, ident: dict, rows: list, size, fps, H, surface, grid, max_
     keep = np.unique(np.linspace(0, n - 1, min(n, 300)).round().astype(int))
     return {
         "player_id": pid, "team": ident.get("team"), "number": ident.get("number"),
+        "name": ident.get("name"), "team_name": ident.get("team_name"),
         "track_ids": sorted({int(r[4]) for r in ordered}),
         "first_seen": round(float(t[0]), 2), "last_seen": round(float(t[-1]), 2),
         "visible_seconds": round(secs, 2), "samples": n, "runs": len(runs),
@@ -128,8 +129,15 @@ def compute(tracks: dict, identities: dict, frame_size: tuple[int, int], sample_
 def run(job_dir: Path, meta: dict) -> dict:
     job_dir = Path(job_dir)
     load = lambda name: json.loads((job_dir / name).read_text()) if (job_dir / name).exists() else None  # noqa: E731
-    out = compute(track.load(job_dir / "tracks.npz"), load("identities.json") or {},
+    tracks = track.load(job_dir / "tracks.npz")
+    live = load("live.json")
+    if live is not None:  # close-ups and bench shots are not court positions: leave them out
+        keep = np.isin(tracks["frame"], live["frames"])
+        tracks = {k: v[keep] for k, v in tracks.items()}
+    out = compute(tracks, load("identities.json") or {},
                   (meta["proxy"]["width"], meta["proxy"]["height"]),
                   meta.get("tracking", {}).get("sample_fps", 5), load("calibration.json"))
+    if live is not None:
+        out["live"] = live["summary"]
     (job_dir / "analytics.json").write_text(json.dumps(out))
     return out

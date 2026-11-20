@@ -73,7 +73,9 @@ def draw(frame: np.ndarray, people: list[dict], ball, identities: dict, trails: 
         x1, y1, x2, y2 = (int(round(v)) for v in p["xyxy"])
         col = _color(identities.get(p["track_id"]))
         cv2.rectangle(frame, (x1, y1), (x2, y2), col, 2)
-        label = f"{pid[p['track_id']]} {p['conf']:.2f}"
+        ident = identities.get(p["track_id"]) or {}
+        name = f"{ident['number']} {ident['name'].split()[-1]}" if ident.get("name") else pid[p["track_id"]]
+        label = f"{name} {p['conf']:.2f}"
         (tw, th), base = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
         top = max(y1 - th - base - 4, 0)
         cv2.rectangle(frame, (x1, top), (x1 + tw + 6, top + th + base + 4), col, -1)
@@ -89,7 +91,9 @@ def draw(frame: np.ndarray, people: list[dict], ball, identities: dict, trails: 
 
 def render(proxy, w: int, h: int, tracks: dict, identities: dict, sample_fps: float, out_path,
            out_fps: int = 10, start: float = 0.0, seconds: float | None = None,
-           trail_seconds: float = 2.0, on_progress: Callable[[float], None] = lambda p: None) -> dict:
+           trail_seconds: float = 2.0, on_progress: Callable[[float], None] = lambda p: None,
+           live_frames: set[int] | None = None) -> dict:
+    """live_frames: sample-frame indices of live play; elsewhere (close-ups, bench) nothing is drawn."""
     t0 = time.time()
     dec_cmd = ["ffmpeg", "-v", "error", "-ss", str(start), "-i", str(proxy)]
     if seconds is not None:
@@ -107,7 +111,11 @@ def render(proxy, w: int, h: int, tracks: dict, identities: dict, sample_fps: fl
         while len(buf := dec.stdout.read(size)) == size:
             t = start + n / out_fps
             frame = np.frombuffer(buf, np.uint8).reshape(h, w, 3).copy()
-            people = interpolate(tracks, t, sample_fps)
+            live = live_frames is None or int(round(t * sample_fps)) in live_frames
+            people = interpolate(tracks, t, sample_fps) if live else []
+            if not live:
+                trails.clear()  # a cut away from live play: don't connect trails across it
+                cv2.putText(frame, "not live play", (12, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2, cv2.LINE_AA)
             for p in people:
                 pid = (identities.get(p["track_id"]) or {}).get("player_id", f"trk-{p['track_id']}")
                 x1, _, x2, y2 = p["xyxy"]
@@ -116,7 +124,8 @@ def render(proxy, w: int, h: int, tracks: dict, identities: dict, sample_fps: fl
                 while q[0][0] < t - trail_seconds:
                     q.popleft()
             pts = {pid: [xy for _, xy in q] for pid, q in trails.items()}
-            enc.stdin.write(draw(frame, people, ball_at(tracks, t, sample_fps), identities, pts).tobytes())
+            ball = ball_at(tracks, t, sample_fps) if live else None
+            enc.stdin.write(draw(frame, people, ball, identities, pts).tobytes())
             n += 1
             if total:
                 on_progress(min(n / out_fps / total, 1.0))

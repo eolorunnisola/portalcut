@@ -52,6 +52,15 @@ def embed(images: list[Image.Image], batch: int = 32) -> np.ndarray:
     return np.concatenate(out) if out else np.zeros((0, 384), np.float32)
 
 
+def stripe_flips(img: Image.Image) -> int:
+    """How often column brightness crosses its mean across the jersey centre. Referees' vertical stripes
+    measured 8+ on 5 of 7 crops; players 8+ on 6.8% of 278 crops (UConn-Arizona broadcast)."""
+    v = np.asarray(img.convert("HSV"))[..., 2].astype(np.float32)
+    c = v[:, v.shape[1] // 5: -max(1, v.shape[1] // 5)]
+    prof = c.mean(0) if c.size else np.zeros(1)
+    return int((np.diff(np.sign(prof - prof.mean())) != 0).sum())
+
+
 def team_color(img: Image.Image) -> np.ndarray:
     """Brightness x saturation of the jersey centre: what separates white from navy (hue alone can't)."""
     a = np.asarray(img.convert("HSV"))
@@ -157,8 +166,13 @@ def build_features(job_dir: Path, w: int, h: int, fps: float = track.SAMPLE_FPS,
             hist[k] = np.mean([color_hist(torsos[j]) for j in np.where(m)[0]], axis=0)
             team_feat[k] = np.mean([team_color(torsos[j]) for j in np.where(m)[0]], axis=0)
     mr = np.array(meta_rows, dtype=np.int32).reshape(-1, 4)
+    # per-crop colour and stripes too: identity votes per crop, and a piece whose crops disagree is a tracker swap
+    crop_team = np.array([team_color(im) for im in torsos], np.float32).reshape(-1, 12)
+    crop_flips = np.array([stripe_flips(im) for im in torsos], np.int16)
     np.savez_compressed(job_dir / "features.npz", track_id=mr[:, 0], first=mr[:, 1], last=mr[:, 2], n=mr[:, 3],
-                        emb=emb, hist=hist, team_feat=team_feat, select_frames=np.array(sorted(select_frames), dtype=np.int32))
+                        emb=emb, hist=hist, team_feat=team_feat, crop_owner=owners_arr.astype(np.int32),
+                        crop_team=crop_team, crop_flips=crop_flips,
+                        select_frames=np.array(sorted(select_frames), dtype=np.int32))
     return {"tracks": int(len(tids)), "crops": len(torsos), "model": EMBED_MODEL, "seconds": round(time.time() - t0, 1)}
 
 
@@ -166,7 +180,7 @@ def build_features(job_dir: Path, w: int, h: int, fps: float = track.SAMPLE_FPS,
 
 def team_clusters(hist: np.ndarray, n: np.ndarray, k: int = 3, iters: int = 20) -> np.ndarray:
     """Group tracks by jersey colour: two teams plus one cluster for referees and everything else."""
-    x = np.sqrt(hist)  # Hellinger space: euclidean distance compares colour histograms sensibly
+    x = np.sqrt(np.clip(hist, 0, None))  # Hellinger space: euclidean distance compares colour histograms sensibly
     fit = x[n >= MIN_TRACK_LEN] if (n >= MIN_TRACK_LEN).sum() >= k else x
     if len(fit) < k:
         return np.zeros(len(x), int)
