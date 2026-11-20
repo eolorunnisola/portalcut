@@ -42,7 +42,9 @@ def test_upload_runs_tracking_end_to_end(sample, tmp_db):
     """Real model on a synthetic video with no people: checks the wiring, not accuracy."""
     import time
     client = TestClient(app_mod.app)
-    job_id = client.post("/api/jobs", params={"filename": "g.mp4"}, content=sample.read_bytes()).json()["id"]
+    # jersey_numbers off: the real .env key must never be spent by a test
+    job_id = client.post("/api/jobs", params={"filename": "g.mp4", "jersey_numbers": "false"},
+                         content=sample.read_bytes()).json()["id"]
     for _ in range(600):
         job = client.get(f"/api/jobs/{job_id}").json()
         if job["status"] in db.FINAL:
@@ -50,8 +52,13 @@ def test_upload_runs_tracking_end_to_end(sample, tmp_db):
         time.sleep(0.5)
     assert job["status"] == "ready", job["error"]
     t = job["meta"]["tracking"]
-    assert t["frames"] == 20 and t["sample_fps"] == track.SAMPLE_FPS
-    assert client.get(f"/api/jobs/{job_id}/debug").status_code == 200
+    from portalcut.config import Config
+    fps = Config().detect_fps
+    assert t["sample_fps"] == fps and t["frames"] == int(4 * fps)  # 4 s synthetic video
+    assert client.get(f"/api/jobs/{job_id}/annotated").status_code == 200
+    assert job["meta"]["numbers"] == {"skipped": "jersey numbers off or ANTHROPIC_API_KEY not set"}
+    assert {"identities", "annotated", "analytics"} <= set(job["meta"])        # every stage ran
+    assert client.get(f"/api/jobs/{job_id}/players").json()["players"] == []   # synthetic video: no people
 
 
 def test_retrack_rules(tmp_db):

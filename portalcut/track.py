@@ -5,15 +5,12 @@ Output: data/<job>/tracks.npz with one row per detection:
 """
 
 import subprocess
-import sys
 import threading
 import time
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw
-
-from portalcut import db
 
 SAMPLE_FPS = 5          # detections per second of video; tracks are re-linked later by re-ID
 BATCH = 8
@@ -23,21 +20,12 @@ DEBUG_SECONDS = 60
 PERSON, BALL = 0, 1
 PALETTE = [(234, 88, 12), (37, 99, 235), (22, 163, 74), (219, 39, 119), (202, 138, 4), (124, 58, 237), (8, 145, 178)]
 
-_model = None
 _gpu = threading.Lock()  # one tracking job at a time: the model and GPU are shared
 
 
-def _load_model():
-    global _model
-    if _model is None:
-        from rfdetr import RFDETRMedium  # heavy import; only when tracking runs
-        _model = RFDETRMedium()  # picks MPS on Apple Silicon, CUDA if present, else CPU
-    return _model
-
-
-def read_frames(video: Path, w: int, h: int, fps: float, seconds: float | None = None):
-    """Yield RGB frames sampled at `fps`, decoded by ffmpeg (no OpenCV needed)."""
-    cmd = ["ffmpeg", "-v", "error", "-i", str(video)]
+def read_frames(video: Path, w: int, h: int, fps: float, seconds: float | None = None, start: float = 0.0):
+    """Yield RGB frames sampled at `fps`, decoded by ffmpeg (handles phone rotation and HEVC)."""
+    cmd = ["ffmpeg", "-v", "error"] + (["-ss", f"{start:.3f}"] if start else []) + ["-i", str(video)]
     if seconds:
         cmd += ["-t", str(seconds)]
     cmd += ["-vf", f"fps={fps}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
@@ -64,32 +52,54 @@ def _batches(it, n):
         yield batch
 
 
-def track(proxy: Path, w: int, h: int, duration: float, fps: float = SAMPLE_FPS, on_progress=lambda p: None) -> dict:
-    import supervision as sv
-    from rfdetr import ClassThresholds
-    from trackers import ByteTrackTracker
+def make_tracker(name: str, fps: float, lost_seconds: float):
+    """ByteTrack, BoT-SORT (adds camera-motion compensation from the frames) or OC-SORT."""
+    from trackers import BoTSORTTracker, ByteTrackTracker, OCSORTTracker
+    # the trackers library counts lost_track_buffer in 30 FPS frames whatever the real rate:
+    # passing fps*3 (=15 at 5 fps) meant 0.5 s, so every longer occlusion started a new ID
+    buf = round(30 * lost_seconds)
+    cls = {"bytetrack": ByteTrackTracker, "botsort": BoTSORTTracker, "ocsort": OCSORTTracker}[name]
+    return cls(frame_rate=fps, lost_track_buffer=buf)
 
-    model = _load_model()
-    tracker = ByteTrackTracker(frame_rate=fps, lost_track_buffer=int(fps * 3))
-    thresholds = ClassThresholds({"person": PERSON_CONF, "sports ball": BALL_CONF}, default=float("inf"))
+
+def detect_all(proxy: Path, w: int, h: int, fps: float, detector, start: float = 0.0, seconds: float | None = None,
+               on_progress=lambda p: None) -> list:
+    """Detections for every sampled frame (cacheable, so trackers can be compared on identical input)."""
+    total = max(1, int((seconds or 1e9) * fps))
+    out = []
+    for batch in _batches(read_frames(proxy, w, h, fps, seconds, start), BATCH):
+        out += detector.detect(batch)
+        on_progress(min(1.0, len(out) / total))
+    return out
+
+
+def track(proxy: Path, w: int, h: int, duration: float, fps: float = SAMPLE_FPS, on_progress=lambda p: None,
+          detector=None, tracker: str = "bytetrack", lost_seconds: float = 3.0, detections: list | None = None,
+          start: float = 0.0, seconds: float | None = None) -> dict:
+    """Detect (unless `detections` are given) and track. Frames are always decoded: BoT-SORT needs them."""
+    import supervision as sv
+    from portalcut.detect import RFDETRDetector
+
+    detector = detector or RFDETRDetector(PERSON_CONF, BALL_CONF)
+    trk = make_tracker(tracker, fps, lost_seconds)
+    span = seconds or (duration - start)
+    total = max(1, int(span * fps))
     rows = []  # (frame, t, track_id, cls, x1, y1, x2, y2, conf)
-    total = max(1, int(duration * fps))
     i = 0
     t0 = time.time()
-    for batch in _batches(read_frames(proxy, w, h, fps), BATCH):
-        for det in model.predict(batch, threshold=thresholds, include_source_image=False):
-            names = det.data["class_name"]
-            people = det[names == "person"]
-            tracked = tracker.update(sv.Detections(xyxy=people.xyxy, confidence=people.confidence,
-                                                   class_id=np.zeros(len(people), int)))
-            t = i / fps
+    for batch in _batches(read_frames(proxy, w, h, fps, seconds, start), BATCH):
+        dets = detections[i:i + len(batch)] if detections is not None else detector.detect(batch)
+        for frame, det in zip(batch, dets):
+            tracked = trk.update(sv.Detections(xyxy=det.people_xyxy.reshape(-1, 4), confidence=det.people_conf,
+                                               class_id=np.zeros(len(det.people_conf), int)), frame)
+            t = start + i / fps
+            fr = int(round(t * fps))
             for box, tid, c in zip(tracked.xyxy, tracked.tracker_id, tracked.confidence):
                 if tid >= 0:  # -1 = not yet confirmed
-                    rows.append((i, t, int(tid), PERSON, *box, c))
-            balls = det[names == "sports ball"]
-            if len(balls):  # at most one ball on court: keep the most confident
-                b = int(np.argmax(balls.confidence))
-                rows.append((i, t, -1, BALL, *balls.xyxy[b], balls.confidence[b]))
+                    rows.append((fr, t, int(tid), PERSON, *box, c))
+            if len(det.ball_conf):  # at most one ball on court: keep the most confident
+                b = int(np.argmax(det.ball_conf))
+                rows.append((fr, t, -1, BALL, *det.ball_xyxy[b], det.ball_conf[b]))
             i += 1
         on_progress(min(1.0, i / total))
     elapsed = time.time() - t0
@@ -97,12 +107,14 @@ def track(proxy: Path, w: int, h: int, duration: float, fps: float = SAMPLE_FPS,
     arr = np.array(rows, dtype=np.float32).reshape(-1, 9)
     people = arr[arr[:, 3] == PERSON]
     stats = {
-        "model": "rf-detr-medium",
-        "device": str(model.model.device),
+        "model": detector.name,
+        "device": detector.device if hasattr(detector, "device") else "",
+        "tracker": tracker,
+        "lost_seconds": lost_seconds,
         "sample_fps": fps,
         "frames": i,
         "seconds": round(elapsed, 1),
-        "x_realtime": round(elapsed / max(duration, 1e-6), 3),  # <1 means faster than the video plays
+        "x_realtime": round(elapsed / max(span, 1e-6), 3),  # <1 means faster than the video plays
         "tracks": int(len(np.unique(people[:, 2]))),
         "people_per_frame": round(len(people) / max(i, 1), 2),
         "ball_found_pct": round(100 * len(np.unique(arr[arr[:, 3] == BALL][:, 0])) / max(i, 1), 1),
@@ -146,39 +158,3 @@ def debug_video(proxy: Path, tracks: dict, w: int, h: int, fps: float, out: Path
     enc.stdin.close()
     if enc.wait() != 0:
         raise RuntimeError("debug video encode failed")
-
-
-def run(job_id: str, job_dir: Path) -> None:
-    with _gpu:
-        _run(job_id, job_dir)
-
-
-def _run(job_id: str, job_dir: Path) -> None:
-    try:
-        meta = db.get(job_id)["meta"]
-        p = meta["proxy"]
-        db.update(job_id, status="tracking", progress=0, error=None)
-        res = track(job_dir / "proxy.mp4", p["width"], p["height"], p["duration_sec"],
-                    on_progress=lambda x: db.update(job_id, progress=round(x, 3)))
-        save(res["rows"], job_dir / "tracks.npz")
-        db.update(job_id, status="debug_video", progress=0)
-        debug_video(job_dir / "proxy.mp4", load(job_dir / "tracks.npz"), p["width"], p["height"],
-                    SAMPLE_FPS, job_dir / "debug_tracks.mp4")
-        meta["tracking"] = res["stats"]
-        db.update(job_id, status="features", progress=0, meta=meta)
-        from portalcut import reid  # reid imports this module
-        meta["features"] = reid.build_features(job_dir, p["width"], p["height"],
-                                               on_progress=lambda x: db.update(job_id, progress=round(x, 3)))
-        meta.pop("selection", None)  # new tracks invalidate any earlier selection
-        (job_dir / "selection.json").unlink(missing_ok=True)
-        db.update(job_id, status="ready", progress=1.0, meta=meta)
-    except Exception as e:  # surface any failure in the UI instead of a stuck job
-        db.update(job_id, status="failed", error=f"tracking: {type(e).__name__}: {e}"[:1000])
-
-
-if __name__ == "__main__":
-    # Re-run tracking on an already-ingested job: uv run python -m portalcut.track <job_id>
-    jid = sys.argv[1]
-    run(jid, db.DATA_DIR / jid)
-    job = db.get(jid)
-    print(job["status"], job["error"] or job["meta"]["tracking"])

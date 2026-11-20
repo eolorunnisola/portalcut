@@ -97,7 +97,9 @@ function upload(file) {
 }
 
 const LABEL = { uploaded:'Queued', probing:'Reading video', making_proxy:'Making 720p proxy', audio:'Analysing audio',
-  ingested:'Waiting to track players', tracking:'Tracking players and ball', debug_video:'Drawing debug video', features:'Learning what each player looks like',
+  ingested:'Waiting to track players', queued:'Queued', tracking:'Detecting and tracking players', features:'Learning what each player looks like',
+  numbers:'Reading jersey numbers', identities:'Linking track pieces into players', annotating:'Drawing the annotated video',
+  analytics:'Computing player statistics', analysis:'Gemini analysis',
   selecting:'Building your player view (following you through clumps)', reading_numbers:'Reading jersey numbers', finding_plays:'Finding plays with Claude', ready:'Ready', failed:'Failed' };
 const PLAY = { made_shot:'Made shot', missed_shot:'Missed shot', assist:'Assist', steal:'Steal', block:'Block',
   rebound:'Rebound', drive:'Drive', possession:'Has the ball', defensive_stop:'Defensive stop' };
@@ -162,8 +164,9 @@ function render(job) {
   } else if (job.status === 'ready' && m && m.features) {
     selectPanel(job, card);
     const d = el('details', { style: 'margin-top:16px' });
-    d.append(el('summary', { className: 'status' }, 'Tracking check (first 60 s, all players; yellow circle = ball)'));
-    d.append(el('video', { src: `/api/jobs/${job.id}/debug`, controls: true, preload: 'none' }));
+    d.append(el('summary', { className: 'status' }, 'Annotated video: every player, IDs, team colours, trails, ball'));
+    d.append(el('video', { src: `/api/jobs/${job.id}/annotated`, controls: true, preload: 'none' }));
+    d.append(el('a', { href: `/dashboard?job=${job.id}`, className: 'status' }, 'Open the analytics dashboard'));
     card.append(d);
   } else if (job.status === 'ready') {
     card.append(el('video', { src: `/api/jobs/${job.id}/proxy`, controls: true, preload: 'metadata' }));

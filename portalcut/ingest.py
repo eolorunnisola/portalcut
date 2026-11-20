@@ -8,7 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
-from portalcut import db, track
+from portalcut import db, pipeline
+from portalcut.config import Config
 
 PROXY_MAX_HEIGHT = 720
 AUDIO_RATE = 16000
@@ -40,12 +41,13 @@ def _hw_encoder() -> bool:
     return "h264_videotoolbox" in out
 
 
-def make_proxy(src: Path, dst: Path, duration: float, on_progress=lambda p: None) -> None:
+def make_proxy(src: Path, dst: Path, duration: float, on_progress=lambda p: None,
+               max_height: int = PROXY_MAX_HEIGHT) -> None:
     # Hardware encoding on Apple Silicon is several times faster for 2-hour games; libx264 elsewhere.
     codec = ["-c:v", "h264_videotoolbox", "-b:v", "4M"] if _hw_encoder() else ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
     cmd = [
         "ffmpeg", "-y", "-v", "error", "-i", str(src),
-        "-vf", f"scale=-2:'min({PROXY_MAX_HEIGHT},ih)'",
+        "-vf", f"scale=-2:'min({max_height},ih)'",
         *codec, "-pix_fmt", "yuv420p", "-an",
         "-progress", "pipe:1", "-nostats", str(dst),
     ]
@@ -80,11 +82,12 @@ def run(job_id: str, job_dir: Path, src: Path) -> None:
     t0 = time.time()
     try:
         db.update(job_id, status="probing", progress=0)
-        meta = probe(src)
+        cfg = Config.from_dict((db.get(job_id)["meta"] or {}).get("config"))  # set at upload
+        meta = probe(src) | {"config": cfg.to_dict()}
         db.update(job_id, status="making_proxy", meta=meta)
 
         make_proxy(src, job_dir / "proxy.mp4", meta["duration_sec"],
-                   lambda p: db.update(job_id, progress=round(p, 3)))
+                   lambda p: db.update(job_id, progress=round(p, 3)), cfg.proxy_height)
 
         db.update(job_id, status="audio", progress=0)
         rms = audio_rms(src, job_dir / "audio.wav") if meta["has_audio"] else []
@@ -98,7 +101,7 @@ def run(job_id: str, job_dir: Path, src: Path) -> None:
     except Exception as e:  # surface any failure in the UI instead of a stuck job
         db.update(job_id, status="failed", error=f"{type(e).__name__}: {e}"[:1000])
         return
-    track.run(job_id, job_dir)
+    pipeline.run(job_id, job_dir)
 
 
 def check_tools() -> None:

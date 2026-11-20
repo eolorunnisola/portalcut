@@ -1,6 +1,9 @@
 # PortalCut
 
-Local app: basketball game video → highlight clips for one selected player.
+Local sports player-tracking system: upload a game video, and every visible player is detected,
+tracked, linked into named players (team + jersey number), drawn on an annotated video and turned
+into movement statistics. On top of that: highlight plays for one selected player, and optional
+Gemini Flash interpretation of the game. Architecture and design decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Setup
 
@@ -9,28 +12,14 @@ brew install ffmpeg
 uv sync
 ```
 
-To find plays (milestone 4), put your Claude API key in a `.env` file in this folder. It is git-ignored and never committed:
+API keys go in a `.env` file in this folder (git-ignored, never committed). Both are optional:
 
 ```
-ANTHROPIC_API_KEY=your-key
+ANTHROPIC_API_KEY=your-key   # jersey numbers (~$0.01 per 3 min) and highlight plays
+GEMINI_API_KEY=your-key      # optional Gemini Flash game analysis; GEMINI_MODEL overrides the model
 ```
 
-How finding plays works and what it costs:
-
-- Your player's on-screen time is cut into 5 s windows. Each window is sent to Claude Haiku 5.5 as 10 frames, with your player outlined in magenta.
-- Borderline calls, and every made shot and assist, get a second opinion from Claude Sonnet 5.5 (16 frames).
-- The page shows an estimate before anything is sent. Each run stops at a $1 budget, which you can change in `BUDGET_USD` in `portalcut/events.py`.
-- Answers are cached in `data/<job>/vlm_cache/`, so a re-run of the same moments is free.
-
-## Measure (answer keys)
-
-Hand-labelled plays live in `eval/`. Score a job's detected plays against one:
-
-```bash
-uv run python -m portalcut.eval <job_id> eval/uconn_arizona_az13.json
-```
-
-It prints precision and recall per play type (a match is the same type within ±2 s) and lists misses and false plays. Detections inside the key's `ignore` ranges (replays, dead time) are not counted.
+Models download once on first use: RF-DETR Medium (~350 MB), DINOv2-small (~90 MB), SAM 2.1 tiny (~150 MB).
 
 ## Run
 
@@ -38,7 +27,57 @@ It prints precision and recall per play type (a match is the same type within ±
 uv run portalcut
 ```
 
-Open http://localhost:8000 and drop in a game video. Everything stays in `data/` on this machine.
+Open http://localhost:8000, drop in a video, then open the dashboard link on the job
+(`/dashboard?job=<id>`). Everything stays in `data/` on this machine.
+
+## Pipeline
+
+`ingest → tracking → features → numbers → identities → annotating → analytics → analysis (optional)`
+
+| Stage | Output in `data/<job>/` |
+|---|---|
+| ingest: probe, 720p proxy, audio loudness | `proxy.mp4`, `audio_rms.json` |
+| tracking: RF-DETR (person, ball) + BoT-SORT | `tracks.npz` (frame, time, track ID, class, box, confidence) |
+| features: appearance + jersey-colour per track piece | `features.npz`, crops |
+| numbers: jersey numbers read by Claude Haiku, majority vote | `numbers.json` |
+| identities: team + number links track pieces into players | `identities.json` (`T1-13` = team 1, #13) |
+| annotating: boxes, IDs, team colours, confidence, trails, ball | `annotated.mp4` |
+| analytics: positions, distance, speed, heatmaps, zones | `analytics.json` |
+| analysis: Gemini Flash on sampled frames + tracking summary | `analysis.json` |
+
+### Settings
+
+Pass any of these as query parameters on upload (`POST /api/jobs?filename=game.mp4&tracker=bytetrack`)
+or in `config` when re-running (`POST /api/jobs/{id}/track`):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `proxy_height` | 720 | processing resolution |
+| `detect_fps` | 10 | detections per second |
+| `person_conf`, `ball_conf` | 0.4, 0.25 | minimum detection confidence |
+| `tracker` | `botsort` | `botsort`, `bytetrack` or `ocsort` |
+| `lost_seconds` | 1.0 | how long a lost track can be re-found |
+| `annotate_fps` | 10 | annotated video frame rate |
+| `jersey_numbers` | true | read numbers with Claude Haiku (capped at $0.25) |
+| `gemini`, `gemini_interval_s` | false, 30 | Gemini analysis and its frame sampling |
+
+### API
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/jobs?filename=…` | upload (raw body) and start processing |
+| `GET /api/jobs`, `GET /api/jobs/{id}` | list jobs, status and progress |
+| `POST /api/jobs/{id}/track` | re-run from a stage: `{"start_stage": "identities", "config": {…}}` |
+| `GET /api/jobs/{id}/tracks?start=&end=&track_id=` | raw tracking data |
+| `GET /api/jobs/{id}/players?min_seconds=` | per-player statistics |
+| `GET /api/jobs/{id}/players/{player_id}` | one player, with trajectory and heatmap |
+| `GET /api/jobs/{id}/annotated?download=true` | annotated video |
+| `PUT /api/jobs/{id}/calibration` | 4 image points + their court positions → statistics in metres |
+| `POST`, `GET /api/jobs/{id}/analysis` | run and read the Gemini analysis |
+| `/api/jobs/{id}/select/…`, `/plays` | pick one player and find their highlight plays |
+
+Every distance and speed is labelled with its units. Without calibration they are **estimates in image
+pixels** (screen positions, distorted by camera pans), not real-world measurements.
 
 ## Test
 
@@ -46,45 +85,45 @@ Open http://localhost:8000 and drop in a game video. Everything stays in `data/`
 uv run pytest -q
 ```
 
-## Status
+Score detected highlight plays against a hand-labelled answer key:
 
-| Milestone | State |
-|---|---|
-| 1. Upload + ingest (metadata, 720p proxy, audio loudness curve) | done |
-| 2. Player and ball tracking (RF-DETR Medium + ByteTrack, 60 s debug video) | done |
-| 3. Player selection (click your player, answer "Is this you?", 2 min player-only video) | done |
-| 4. Event detection (Claude Haiku 5.5, Sonnet 5.5 second opinions, cost cap) | done; tested on the 1-on-1 sample only |
-| 5. Review + export | next |
-| 6. Eval | |
+```bash
+uv run python -m portalcut.eval <job_id> eval/uconn_arizona_az13.json
+```
 
-## Measured so far
+## Measured
 
-| Step | Input | Time | Cost |
-|---|---|---|---|
-| Ingest (Apple Silicon, hardware encoder) | 60 s of 1080p60 | 9.2 s (≈0.15× real time) | $0 |
-| Tracking, 5 frames/s on MPS | 2 min of 1080p60 | 47–50 s (≈0.4× real time) | $0 |
-| Tracking, 3 frames/s on MPS | 2 min of 1080p60 | 28 s (≈0.23× real time), but more broken tracks | $0 |
-| Appearance features (DINOv2-small + jersey colour) | 45 tracks | 6–14 s | $0 |
-| Player selection on the 1-on-1 sample | 1 click | found in all 15 loop segments, 66% of frames, no wrong player | $0 |
-| Find plays, first run (every borderline call re-checked) | 46 windows, 2 min | 43 s; 17 defensive stops + 1 possession | $0.71 (Sonnet $0.68, Haiku $0.04) |
-| Find plays, current rules (only highlight plays re-checked) | same | 19 plays, 0 second opinions needed | ≈$0.04 fresh; $0 re-run from cache |
-| UConn–Arizona broadcast, Arizona #13, full frames at 2 fps | 56 windows | 0 of 2 key plays, 0 false | $0.056 |
-| Same, close-ups at 4 fps + before/after scoreboard | 56 windows | 1 of 2 key plays (the dunk), 0 false | $0.087 |
-| Jersey numbers (Haiku, 10 torso strips per call) | 996 track pieces | 472 read; #13 coverage 3% → 12% | $0.032 |
-| SAM 2 gap fill on Done (20 edges × 2 s) | #13 | +91 frames, incl. the dunk | 169 s, $0 |
+Tracker comparison on 3 minutes of a UConn–Arizona broadcast, identical detections for every tracker.
+"Swaps" are track pieces whose jersey colour flips team (about 19% is measurement noise):
 
-A 2-hour game should take about 18 minutes to ingest and 50 minutes to track. Those figures are extrapolated from a 1-on-1 sample clip, not yet measured on a real game.
+| Detection fps | Tracker | Lost buffer | People kept per frame | Swaps |
+|---|---|---|---|---|
+| 5 | ByteTrack (old setting) | 0.5 s | 6.52 | 37.4% |
+| 5 | ByteTrack | 3 s | 6.73 | 45.8% |
+| 10 | ByteTrack | 0.5 s | 7.17 | 31.7% |
+| 10 | **BoT-SORT (default)** | 1 s | 5.80 | 26.9% |
+| 10 | BoT-SORT | 0.5 s | 5.72 | 24.4% |
+| 10 | OC-SORT | 3 s | 4.55 | 28.8% |
 
-Re-run tracking on an existing job: `uv run python -m portalcut.track <job_id>`.
+Full pipeline on that 3-minute clip (Apple Silicon): tracking 152 s (0.84× real time), 374 track pieces,
+jersey numbers $0.0098, 94 pieces linked into 22 named players, annotated video 11 s, analytics instant.
 
-Models download once: RF-DETR Medium (~350 MB) to `~/.roboflow/models/`, DINOv2-small (~90 MB) to the Hugging Face cache.
+| Earlier measurements | Result | Cost |
+|---|---|---|
+| Ingest, 60 s of 1080p60 | 9.2 s | $0 |
+| Highlight plays, Arizona #13, close-ups at 4 fps + scoreboard | 1 of 2 key plays, 0 false | $0.087 per 56 windows |
+| SAM 2 gap fill when selecting a player | follows the player through a dunk the tracker lost | 169 s |
 
-## Known limits (v1)
+## Known limits
 
-- Local only, no login. The server listens on 127.0.0.1.
-- A job interrupted by a server restart is marked failed; upload it again.
-- Ball detection uses the generic COCO "sports ball" class and finds the ball in only ~28% of sample frames. It is used only as a ranking signal later, never as a filter.
-- Tracks break when players cross or leave the frame. Player selection re-links them by appearance.
-- Selection has only been tested on a 1-on-1 clip with two very different jerseys. Teammates in the same jersey are the hard case; the `BAND` threshold in `portalcut/reid.py` will need tuning on a real game.
-- Jersey-number reading (with Claude Haiku) is not built; add it if teammates get confused.
-- Clicking a different player switches the selection (with Undo). A click on someone who only *might* be a different person (similarity within `BAND`) is treated as another sighting of you instead; if that was wrong, click them again in a frame where your player is also boxed to switch.
+- Local only, no login; the server listens on 127.0.0.1.
+- BoT-SORT keeps about 20% fewer person detections than ByteTrack in exchange for fewer identity swaps.
+- Identity linking needs a jersey number read at least twice; ~60% of visible person-time stays as
+  unnamed track pieces (referees, bench, crowd, short pieces). Seen errors: a navy #24 clustered into the
+  white team (fake "T1-24"), a tracker swap inside one piece, and #18 misread as 13.
+- Referees' striped shirts often cluster with the dark-jersey team.
+- Close-ups, bench shots and replays are tracked like live play (no live-play filter yet).
+- The ball is found in ~36% of frames (generic COCO "sports ball" class).
+- Gemini analysis is built and tested with a fake client only; the default model id `gemini-flash-latest`
+  is unconfirmed until a real call runs with `GEMINI_API_KEY` set.
+- Validated on basketball broadcast footage only; soccer and amateur single-camera video not yet tested.

@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PortalCut dashboard</title>
+<style>
+  :root { --bg:#f7f7f8; --card:#fff; --text:#18181b; --muted:#52525b; --line:#e4e4e7; --accent:#c2410c; --bad:#b91c1c;
+    --warn-bg:#fff7ed; --warn-line:#fdba74; --h0:#fff7ed; --h1:#9a3412; --c0:#2563eb; --c1:#c2410c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111113; --card:#1c1c1f; --text:#f4f4f5; --muted:#a1a1aa; --line:#2e2e33;
+    --accent:#fb923c; --bad:#f87171; --warn-bg:#2a1a0e; --warn-line:#9a3412; --h0:#1c1c1f; --h1:#fb923c; --c0:#60a5fa; --c1:#fb923c; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:960px; margin:0 auto; padding:32px 16px; }
+  h1 { margin:0 0 4px; font-size:24px; word-break:break-all; }
+  h2 { margin:0 0 8px; font-size:17px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-top:16px; }
+  .muted { color:var(--muted); }
+  .err { color:var(--bad); }
+  .note { background:var(--warn-bg); border:1px solid var(--warn-line); border-radius:8px; padding:10px 12px; margin:12px 0 0; font-weight:600; }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 8px; border-radius:99px; border:1px solid var(--accent); color:var(--accent); vertical-align:middle; }
+  dl.meta { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px 16px; margin:12px 0 0; }
+  dl.meta div { min-width:0; } dt { color:var(--muted); font-size:13px; } dd { margin:0; font-weight:600; }
+  video { width:100%; border-radius:8px; background:#000; display:block; }
+  a, .btn { color:var(--accent); }
+  .btn { font:inherit; font-size:14px; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); cursor:pointer; text-decoration:none; display:inline-block; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  a:focus-visible, .btn:focus-visible, th button:focus-visible, tbody tr:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .tablewrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; font-size:14px; font-variant-numeric:tabular-nums; }
+  th, td { padding:6px 8px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th button { font:inherit; font-weight:600; color:var(--text); background:none; border:0; padding:0; cursor:pointer; }
+  tbody tr { cursor:pointer; } tbody tr:hover { background:var(--bg); }
+  tbody tr[aria-selected="true"] { background:var(--bg); box-shadow:inset 3px 0 0 var(--accent); }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-bottom:12px; }
+  .tile { border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+  .tile b { display:block; font-size:18px; } .tile span { color:var(--muted); font-size:12px; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; }
+  canvas { width:100%; height:auto; display:block; border:1px solid var(--line); border-radius:6px; background:var(--card); }
+  .legend { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); margin-top:4px; }
+  .legend i { flex:1; height:8px; border-radius:4px; border:1px solid var(--line); background:linear-gradient(90deg, var(--h0), var(--h1)); }
+  .legend i.t { background:linear-gradient(90deg, var(--c0), var(--c1)); }
+  .zones { display:grid; grid-template-columns:max-content 1fr max-content; gap:4px 8px; align-items:center; font-size:13px; margin:0; padding:0; list-style:none; }
+  .zones li { display:contents; } .zbar { height:10px; background:var(--accent); border-radius:3px; min-width:1px; }
+  ul.list { padding-left:20px; margin:4px 0 12px; } ul.list li { margin:2px 0; }
+  h3 { font-size:15px; margin:12px 0 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">PortalCut dashboard</h1>
+  <p class="muted" id="msg" role="status">Loading...</p>
+  <div id="app" hidden>
+    <section class="card" aria-labelledby="h-sum">
+      <h2 id="h-sum">Summary <span class="badge" id="badge"></span></h2>
+      <dl class="meta" id="meta"></dl>
+      <p class="note" id="note"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-vid">
+      <h2 id="h-vid">Annotated tracking video</h2>
+      <video id="vid" controls preload="metadata" aria-label="Annotated tracking video"></video>
+      <p><a id="dl" class="btn" download>Download</a></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-pl">
+      <h2 id="h-pl">Players</h2>
+      <p class="muted" id="plnote">Players seen for at least 2 seconds. Click a header to sort, click a row to select a player.</p>
+      <div class="tablewrap"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-sel">
+      <h2 id="h-sel">Selected player: <span id="selname">none</span></h2>
+      <p class="muted" id="selmsg" role="status">Select a player in the table.</p>
+      <div id="sel" hidden>
+        <div class="tiles" id="tiles"></div>
+        <div class="grid2">
+          <div><h3>Heatmap</h3><canvas id="heat" role="img"></canvas>
+            <div class="legend"><span>less time</span><i></i><span>more time</span></div></div>
+          <div><h3>Trajectory</h3><canvas id="traj" role="img"></canvas>
+            <div class="legend"><span>early</span><i class="t"></i><span>late</span></div></div>
+        </div>
+        <h3>Time per zone (seconds)</h3><ul class="zones" id="zones"></ul>
+        <h3>Tracking confidence over time</h3>
+        <canvas id="conf" role="img"></canvas>
+        <p class="muted" id="confmsg" role="status"></p>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-an">
+      <h2 id="h-an">Gemini analysis</h2>
+      <div id="an" aria-live="polite"></div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const job = new URLSearchParams(location.search).get('job');
+const API = job ? '/api/jobs/' + encodeURIComponent(job) : '';
+let U = 'px', DATA = null, PLAYERS = [], sortKey = 'visible_seconds', sortDir = -1, selected = null, selToken = 0, JOB = null;
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const num = (v, d = 1) => v == null ? '-' : Number(v).toFixed(d);
+const teamName = t => t == null ? '-' : t === 2 ? 'Other' : 'Team ' + (t + 1);
+const speedU = () => U + '/s';
+function el(tag, attrs = {}, text) {
+  const e = document.createElement(tag); Object.assign(e, attrs);
+  if (text !== undefined) e.textContent = text; return e;
+}
+async function get(path) {
+  const r = await fetch(API + path, { cache: 'no-store' });
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch (e) {} const err = new Error(m); err.status = r.status; throw err; }
+  return r.json();
+}
+function fail(text) { $('msg').textContent = text; $('msg').className = 'err'; }
+
+async function init() {
+  if (!job) return fail('No job given. Open this page as /dashboard?job=<job_id>.');
+  try { JOB = await get(''); } catch (e) { return fail(e.status === 404 ? 'Job not found: ' + job : 'Could not load the job: ' + e.message); }
+  if (JOB.status !== 'ready') return fail(`This job is not ready yet (status: ${JOB.status}). Reload when processing has finished.`);
+  try { DATA = await get('/players?min_seconds=2'); }
+  catch (e) { return fail(e.status === 404 ? 'No analytics for this job yet. Re-run it from the analytics stage.' : 'Could not load players: ' + e.message); }
+  U = DATA.units || 'px'; PLAYERS = DATA.players;
+  $('msg').hidden = true; $('app').hidden = false;
+  header(); video(); tableHead(); tableBody(); analysis();
+  if (PLAYERS.length) select(PLAYERS[0].player_id); else $('selmsg').textContent = 'No players were visible for at least 2 seconds.';
+}
+
+function header() {
+  const m = JOB.meta || {}, tr = m.tracking || {};
+  document.title = 'Dashboard: ' + JOB.filename; $('title').textContent = JOB.filename;
+  $('badge').textContent = DATA.calibrated ? 'calibrated (' + U + ')' : 'estimated (' + U + ')';
+  const items = [['Duration', m.duration_sec != null ? mmss(m.duration_sec) : '-'], ['Tracker', tr.tracker || '-'],
+    ['Tracker fps', num(tr.sample_fps)], ['Detection fps', num(m.config && m.config.detect_fps != null ? m.config.detect_fps : tr.sample_fps)],
+    ['Players (2 s+)', PLAYERS.length], ['Units', U]];
+  $('meta').replaceChildren(...items.map(([k, v]) => { const d = el('div'); d.append(el('dt', {}, k), el('dd', {}, String(v))); return d; }));
+  $('note').textContent = DATA.note || '';
+  $('note').hidden = !DATA.note;
+}
+function video() { $('vid').src = API + '/annotated'; $('dl').href = API + '/annotated?download=true'; }
+
+const COLS = [['player_id', 'Player'], ['team', 'Team'], ['number', 'Number'], ['visible_seconds', 'Visible (s)'],
+  ['distance', () => `Distance (${U})`], ['avg_speed', () => `Avg speed (${speedU()})`], ['max_speed', () => `Max speed (${speedU()})`], ['mean_conf', 'Mean conf.']];
+function tableHead() {
+  $('thead').replaceChildren(...COLS.map(([k, label]) => {
+    const th = el('th', { scope: 'col' }); th.dataset.k = k;
+    th.append(el('button', { type: 'button', onclick: () => { sortDir = sortKey === k ? -sortDir : (k === 'player_id' ? 1 : -1); sortKey = k; tableBody(); } },
+      typeof label === 'function' ? label() : label));
+    return th;
+  }));
+}
+function tableBody() {
+  for (const th of $('thead').children) th.setAttribute('aria-sort', th.dataset.k === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
+  const cmp = (a, b) => { const x = a[sortKey], y = b[sortKey]; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === 'string' ? x.localeCompare(y, undefined, { numeric: true }) : x - y) * sortDir; };
+  $('tbody').replaceChildren(...[...PLAYERS].sort(cmp).map(p => {
+    const tr = el('tr', { tabIndex: 0 }); tr.dataset.id = p.player_id;
+    tr.setAttribute('aria-selected', String(p.player_id === selected));
+    tr.append(el('td', {}, p.player_id), el('td', {}, teamName(p.team)), el('td', {}, p.number ?? '-'), el('td', {}, num(p.visible_seconds)),
+      el('td', {}, num(p.distance)), el('td', {}, num(p.avg_speed, 2)), el('td', {}, num(p.max_speed, 2)), el('td', {}, num(p.mean_conf, 2)));
+    tr.onclick = () => select(p.player_id);
+    tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.player_id); } };
+    return tr;
+  }));
+}
+
+async function select(id) {
+  selected = id; const token = ++selToken; tableBody();
+  $('selname').textContent = id; $('selmsg').hidden = false; $('selmsg').className = 'muted'; $('selmsg').textContent = 'Loading...';
+  let p;
+  try { p = (await get('/players/' + encodeURIComponent(id))).player; }
+  catch (e) { if (token === selToken) { $('selmsg').className = 'err'; $('selmsg').textContent = 'Could not load player: ' + e.message; $('sel').hidden = true; } return; }
+  if (token !== selToken) return;
+  $('selmsg').hidden = true; $('sel').hidden = false;
+  tiles(p); heatmap(p); trajectory(p); zones(p); confidence(p, token);
+}
+
+function tiles(p) {
+  const t = [[`${num(p.distance)} ${U}`, 'Distance'], [`${num(p.avg_speed, 2)} ${speedU()}`, 'Avg speed'], [`${num(p.max_speed, 2)} ${speedU()}`, 'Max speed'],
+    [`${num(p.visible_seconds)} s`, 'Visible'], [p.runs, 'Continuous runs'], [p.track_ids.length, 'Track pieces linked']];
+  $('tiles').replaceChildren(...t.map(([v, k]) => { const d = el('div', { className: 'tile' }); d.append(el('b', {}, String(v)), el('span', {}, k)); return d; }));
+}
+
+// Canvas helper: sizes the backing store for the device pixel ratio and returns a context in CSS-pixel units.
+function setup(cv, w, h, label) {
+  const dpr = window.devicePixelRatio || 1, cssW = Math.min(cv.parentElement.clientWidth || 400, 480);
+  cv.style.maxWidth = cssW + 'px'; cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssW * h / w * dpr);
+  cv.setAttribute('aria-label', label); const c = cv.getContext('2d'); c.scale(dpr, dpr); return [c, cssW, cssW * h / w];
+}
+function mix(a, b, t) { const pa = a.match(/\d+/g).map(Number), pb = b.match(/\d+/g).map(Number); return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(',')})`; }
+function rgb(hex) { const n = parseInt(hex.replace('#', ''), 16); return `rgb(${n >> 16},${n >> 8 & 255},${n & 255})`; }
+const frameSize = () => { const p = (JOB.meta || {}).proxy || {}; return [p.width || 16, p.height || 9]; };
+
+function heatmap(p) {
+  const rows = p.heatmap.length, cols = p.heatmap[0].length, [fw, fh] = frameSize();
+  const [c, W, H] = setup($('heat'), fw, fh, `Heatmap of where ${p.player_id} spent time, ${rows} rows by ${cols} columns, darker orange means more time.`);
+  const max = Math.max(...p.heatmap.flat(), 1e-9), lo = rgb(css('--h0')), hi = rgb(css('--h1'));
+  c.fillStyle = css('--card'); c.fillRect(0, 0, W, H);
+  p.heatmap.forEach((r, j) => r.forEach((v, i) => { c.fillStyle = mix(lo, hi, Math.sqrt(v / max)); c.fillRect(i * W / cols, j * H / rows, W / cols + .5, H / rows + .5); }));
+}
+function trajectory(p) {
+  const tr = p.trajectory; let [fw, fh] = frameSize(), x0 = 0, y0 = 0;
+  if (DATA.calibrated && tr.length) { // surface units: fit the bounds of the path
+    const xs = tr.map(r => r[1]), ys = tr.map(r => r[2]); x0 = Math.min(...xs); y0 = Math.min(...ys);
+    fw = Math.max(Math.max(...xs) - x0, 1e-6); fh = Math.max(Math.max(...ys) - y0, 1e-6);
+  }
+  const [c, W, H] = setup($('traj'), fw, fh, `Path of ${p.player_id} across the frame, blue at the start to orange at the end.`);
+  const s = W / fw, a = rgb(css('--c0')), b = rgb(css('--c1'));
+  c.lineWidth = 2.5; c.lineCap = 'round';
+  for (let i = 1; i < tr.length; i++) {
+    // Break the line over gaps (camera cuts or the player leaving the frame).
+    if (tr[i][0] - tr[i - 1][0] > 1) continue;
+    c.strokeStyle = mix(a, b, i / (tr.length - 1)); c.beginPath();
+    c.moveTo((tr[i - 1][1] - x0) * s, (tr[i - 1][2] - y0) * s); c.lineTo((tr[i][1] - x0) * s, (tr[i][2] - y0) * s); c.stroke();
+  }
+  if (tr.length) { c.fillStyle = a; c.beginPath(); c.arc((tr[0][1] - x0) * s, (tr[0][2] - y0) * s, 4, 0, 7); c.fill(); }
+}
+function zones(p) {
+  const z = Object.entries(p.zones), max = Math.max(...z.map(e => e[1]), 1e-9);
+  $('zones').replaceChildren(...z.map(([k, v]) => { const li = el('li'), bar = el('div', { className: 'zbar' });
+    bar.style.width = (v / max * 100) + '%'; bar.setAttribute('aria-hidden', 'true');
+    li.append(el('span', {}, k.replace('-', ' / ')), bar, el('span', {}, num(v) + ' s')); return li; }));
+}
+
+async function confidence(p, token) {
+  const ids = p.track_ids.slice(0, 10), msg = $('confmsg'); msg.className = 'muted';
+  msg.textContent = 'Loading confidence...';
+  let pts = [];
+  try {
+    const res = await Promise.all(ids.map(id => get('/tracks?track_id=' + id)));
+    if (token !== selToken) return;
+    res.forEach(r => r.rows.forEach(row => pts.push([row[1], row[8]])));
+  } catch (e) { if (token === selToken) { msg.className = 'err'; msg.textContent = 'Could not load tracks: ' + e.message; } return; }
+  pts.sort((a, b) => a[0] - b[0]);
+  msg.textContent = (p.track_ids.length > 10 ? `Showing the first 10 of ${p.track_ids.length} track pieces. ` : '') + `${pts.length} detections.`;
+  const [c, W, H] = setup($('conf'), 4, 1, `Line chart of detection confidence (0 to 1) over time for ${p.player_id}.`);
+  const L = 34, B = 18, T = 6, tMin = pts.length ? pts[0][0] : 0, tMax = pts.length ? pts[pts.length - 1][0] : 1, span = Math.max(tMax - tMin, 1e-6);
+  c.font = '11px system-ui'; c.fillStyle = css('--muted'); c.strokeStyle = css('--line'); c.lineWidth = 1;
+  [0, .5, 1].forEach(v => { const y = T + (1 - v) * (H - T - B); c.beginPath(); c.moveTo(L, y); c.lineTo(W, y); c.stroke(); c.fillText(v.toFixed(1), 4, y + 4); });
+  c.fillText(mmss(tMin), L, H - 4); c.textAlign = 'right'; c.fillText(mmss(tMax), W - 2, H - 4); c.textAlign = 'left';
+  c.strokeStyle = css('--accent'); c.lineWidth = 1.5; c.beginPath();
+  pts.forEach(([t, v], i) => { const x = L + (t - tMin) / span * (W - L - 4), y = T + (1 - v) * (H - T - B); i && t - pts[i - 1][0] <= 1 ? c.lineTo(x, y) : c.moveTo(x, y); });
+  c.stroke();
+}
+
+async function analysis() {
+  const box = $('an'); let a;
+  try { a = await get('/analysis'); }
+  catch (e) {
+    if (e.status !== 404) { box.replaceChildren(el('p', { className: 'err' }, 'Could not load analysis: ' + e.message)); return; }
+    const p = el('p', { className: 'muted' }, 'Not run'), err = el('p', { className: 'err', role: 'alert' });
+    const btn = el('button', { className: 'btn', type: 'button' }, 'Run Gemini analysis');
+    btn.onclick = async () => {
+      btn.disabled = true; err.textContent = '';
+      try {
+        const r = await fetch(API + '/analysis', { method: 'POST' });
+        if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch (x) {} throw new Error(m); }
+        p.textContent = 'Started. This runs in the background; reload this page in a minute or two.'; btn.hidden = true;
+      } catch (x) { err.textContent = x.message; btn.disabled = false; }
+    };
+    box.replaceChildren(p, btn, err); return;
+  }
+  const r = a.result || a, list = (items, f) => { const ul = el('ul', { className: 'list' }); (items || []).forEach(i => ul.append(el('li', {}, f(i)))); return ul; };
+  box.replaceChildren(el('p', {}, r.summary || 'No summary.'),
+    el('h3', {}, 'Segments'), list(r.segments, s => `${mmss(s.t_start)} to ${mmss(s.t_end)}, ${s.phase}${s.team === 'unknown' ? '' : ', team ' + (Number(s.team) + 1)}: ${s.description}`),
+    el('h3', {}, 'Notable events'), list(r.notable_events, e => `${mmss(e.t)} ${e.type}${e.player_id ? ' (' + e.player_id + ')' : ''}: ${e.description}`));
+  if (!(r.segments || []).length) box.children[2].replaceWith(el('p', { className: 'muted' }, 'None.'));
+  if (!(r.notable_events || []).length) box.lastChild.replaceWith(el('p', { className: 'muted' }, 'None.'));
+}
+
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => selected && select(selected), 250); });
+init();
+</script>
+</body>
+</html>

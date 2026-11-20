@@ -392,7 +392,8 @@ def detect(job_dir: Path, meta: dict, start: float = 0.0, seconds: float | None 
     bm = tr["cls"] == track.BALL
     ball = {"t": tr["t"][bm], "xyxy": tr["xyxy"][bm]}
     rms = json.loads((job_dir / "audio_rms.json").read_text()) if (job_dir / "audio_rms.json").exists() else []
-    windows = candidate_windows(player, ball, rms, duration, start=start, seconds=seconds)
+    windows = candidate_windows(player, ball, rms, duration, meta.get("tracking", {}).get("sample_fps", track.SAMPLE_FPS),
+                                start=start, seconds=seconds)
     cache = job_dir / "vlm_cache"
     lock = threading.Lock()
     spent = {"usd": 0.0, "calls": 0, "cached": 0, "escalations": 0, "assist_rechecks": 0, "refusals": 0, "skipped": 0}

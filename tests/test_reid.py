@@ -250,13 +250,13 @@ def test_generated_media_is_not_cached(job_dir, tmp_db):
     import shutil
     shutil.copytree(job_dir, db.DATA_DIR / "nc")
     (db.DATA_DIR / "nc" / "debug_player.mp4").write_bytes(b"x")
-    (db.DATA_DIR / "nc" / "debug_tracks.mp4").write_bytes(b"x")
+    (db.DATA_DIR / "nc" / "annotated.mp4").write_bytes(b"x")
     (db.DATA_DIR / "nc" / "frames").mkdir()
     (db.DATA_DIR / "nc" / "frames" / "0.jpg").write_bytes(b"x")
     db.create("nc", "g.mp4")
     db.update("nc", status="ready", meta={"proxy": {"width": 320, "height": 180}, "features": {"tracks": 6}})
     c = TestClient(app_mod.app)
-    for url in ("/api/jobs/nc/debug_player", "/api/jobs/nc/debug", "/api/jobs/nc/frames/0"):
+    for url in ("/api/jobs/nc/debug_player", "/api/jobs/nc/annotated", "/api/jobs/nc/frames/0"):
         r = c.get(url)
         assert r.status_code == 200 and "no-store" in r.headers.get("cache-control", ""), url
 

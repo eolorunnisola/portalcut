@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import threading
@@ -10,7 +11,8 @@ from fastapi.responses import FileResponse
 
 from pydantic import BaseModel
 
-from portalcut import db, events, ingest, jersey, reid, track
+from portalcut import db, events, ingest, jersey, pipeline, reid, track
+from portalcut.config import Config
 
 ALLOWED_EXT = {".mp4", ".mov", ".m4v", ".mkv"}
 STATIC = Path(__file__).parent / "static"
@@ -27,6 +29,7 @@ def _load_env(path: Path = Path(__file__).resolve().parent.parent / ".env") -> N
 
 
 _load_env()
+logging.basicConfig(level=os.environ.get("PORTALCUT_LOG", "INFO"), format="%(asctime)s %(name)s %(levelname)s %(message)s")
 app = FastAPI(title="PortalCut")
 db.init()
 
@@ -36,11 +39,26 @@ def index():
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})  # always pick up app updates
 
 
+def _config(d: dict) -> Config:
+    try:
+        return Config.from_dict(d)
+    except ValueError as e:  # bad settings are the caller's mistake, not a server error
+        raise HTTPException(400, f"invalid settings: {e}")
+
+
+@app.get("/dashboard")
+def dashboard():
+    return FileResponse(STATIC / "dashboard.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.post("/api/jobs")
 async def upload(request: Request, filename: str):
+    """Upload a video (raw request body). Processing settings go in the query string, e.g.
+    ?filename=game.mp4&detect_fps=10&tracker=bytetrack&gemini=true. Processing starts automatically."""
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(400, f"unsupported file type {ext or '(none)'}; use {sorted(ALLOWED_EXT)}")
+    cfg = _config(dict(request.query_params))
     job_id = uuid.uuid4().hex[:12]
     job_dir = db.DATA_DIR / job_id
     job_dir.mkdir(parents=True)
@@ -58,6 +76,7 @@ async def upload(request: Request, filename: str):
         raise HTTPException(400, "empty upload")
 
     db.create(job_id, Path(filename).name)
+    db.update(job_id, meta={"config": cfg.to_dict()})
     threading.Thread(target=ingest.run, args=(job_id, job_dir, src), daemon=True).start()
     return db.get(job_id)
 
@@ -89,15 +108,111 @@ def remove(job_id: str):
     return {"deleted": job_id}
 
 
+class RunRequest(BaseModel):
+    start_stage: str = "tracking"
+    config: dict | None = None  # settings to change; others keep their current values
+
+
 @app.post("/api/jobs/{job_id}/track")
-def retrack(job_id: str):
-    """Run (or re-run) tracking on a job whose ingest already finished, e.g. one uploaded before tracking existed."""
+def start_tracking(job_id: str, req: RunRequest | None = None):
+    """(Re)run the pipeline from a stage, optionally with new settings. Runs in the background."""
+    req = req or RunRequest()
     job = _job(job_id)
-    if job["status"] not in db.FINAL or not (job["meta"] or {}).get("proxy"):
+    meta = job["meta"] or {}
+    if job["status"] not in db.FINAL or not meta.get("proxy"):
         raise HTTPException(409, "job is busy or was never ingested")
-    db.update(job_id, status="ingested", progress=0, error=None)
-    threading.Thread(target=track.run, args=(job_id, db.DATA_DIR / job_id), daemon=True).start()
+    if req.start_stage not in pipeline.STAGES:
+        raise HTTPException(400, f"start_stage must be one of {pipeline.STAGES}")
+    if req.start_stage != "tracking" and not (db.DATA_DIR / job_id / "tracks.npz").exists():
+        raise HTTPException(409, "no tracking output yet: start from 'tracking'")
+    meta["config"] = _config((meta.get("config") or {}) | (req.config or {})).to_dict()
+    db.update(job_id, status="queued", progress=0, error=None, meta=meta)
+    threading.Thread(target=pipeline.run, args=(job_id, db.DATA_DIR / job_id, req.start_stage), daemon=True).start()
     return db.get(job_id)
+
+
+def _fps(meta: dict) -> float:
+    return (meta.get("tracking") or {}).get("sample_fps", track.SAMPLE_FPS)
+
+
+def _file(job_id: str, name: str) -> Path:
+    path = db.DATA_DIR / _job(job_id)["id"] / name  # the id comes from the database: no path traversal
+    if not path.exists():
+        raise HTTPException(404, f"{name} not available yet")
+    return path
+
+
+@app.get("/api/jobs/{job_id}/tracks")
+def tracking_data(job_id: str, start: float = 0.0, end: float | None = None, track_id: int | None = None,
+                  limit: int = 20000):
+    """Detections with track IDs, timestamps and confidences, as columns. Filter by time and track."""
+    import numpy as np
+    t = track.load(_file(job_id, "tracks.npz"))
+    m = (t["t"] >= start) & ((t["t"] <= end) if end is not None else True)
+    if track_id is not None:
+        m &= t["track_id"] == track_id
+    idx = np.flatnonzero(m)[:limit]
+    return {"columns": ["frame", "t", "track_id", "cls", "x1", "y1", "x2", "y2", "conf"], "truncated": int(m.sum()) > limit,
+            "rows": [[int(t["frame"][i]), round(float(t["t"][i]), 2), int(t["track_id"][i]), int(t["cls"][i]),
+                      *[round(float(v), 1) for v in t["xyxy"][i]], round(float(t["conf"][i]), 3)] for i in idx]}
+
+
+@app.get("/api/jobs/{job_id}/players")
+def players(job_id: str, min_seconds: float = 0.0):
+    """Per-player statistics without the bulky trajectory and heatmap (see /players/{player_id})."""
+    a = json.loads(_file(job_id, "analytics.json").read_text())
+    slim = [{k: v for k, v in p.items() if k not in ("trajectory", "heatmap")} for p in a["players"]
+            if p["visible_seconds"] >= min_seconds]
+    return {k: v for k, v in a.items() if k != "players"} | {"players": slim}
+
+
+@app.get("/api/jobs/{job_id}/players/{player_id}")
+def player(job_id: str, player_id: str):
+    a = json.loads(_file(job_id, "analytics.json").read_text())
+    for p in a["players"]:
+        if p["player_id"] == player_id:
+            return {k: v for k, v in a.items() if k != "players"} | {"player": p}
+    raise HTTPException(404, "player not found")
+
+
+@app.get("/api/jobs/{job_id}/annotated")
+def annotated_video(job_id: str, download: bool = False):
+    name = f"{Path(_job(job_id)['filename']).stem}-tracked.mp4"
+    return FileResponse(_file(job_id, "annotated.mp4"), media_type="video/mp4", headers=NO_STORE,
+                        filename=name if download else None)
+
+
+@app.post("/api/jobs/{job_id}/analysis")
+def run_analysis(job_id: str):
+    """Run the optional Gemini Flash analysis on a finished job (background)."""
+    from portalcut import analysis
+    job = _job(job_id)
+    if job["status"] != "ready" or not (db.DATA_DIR / job_id / "analytics.json").exists():
+        raise HTTPException(409, "tracking and analytics must finish first")
+    if not analysis.api_key_present():
+        raise HTTPException(400, "Add GEMINI_API_KEY=... to the .env file in the project folder, then restart the app")
+    return start_tracking(job_id, RunRequest(start_stage="analysis", config={"gemini": True}))
+
+
+@app.get("/api/jobs/{job_id}/analysis")
+def get_analysis(job_id: str):
+    return json.loads(_file(job_id, "analysis.json").read_text())
+
+
+class Calibration(BaseModel):
+    image_points: list[list[float]]
+    world_points: list[list[float]]
+    units: str = "m"
+    surface: list[float]
+
+
+@app.put("/api/jobs/{job_id}/calibration")
+def set_calibration(job_id: str, cal: Calibration):
+    """Four image points and their real positions on the playing surface; analytics are recomputed in metres."""
+    if len(cal.image_points) != 4 or len(cal.world_points) != 4 or len(cal.surface) != 2:
+        raise HTTPException(400, "need exactly 4 image points, 4 world points and surface [width, height]")
+    (db.DATA_DIR / _job(job_id)["id"] / "calibration.json").write_text(cal.model_dump_json())
+    return start_tracking(job_id, RunRequest(start_stage="analytics"))
 
 
 def _ready_for_selection(job_id: str) -> Path:
@@ -187,7 +302,7 @@ def _finish(job_id: str, job_dir: Path) -> None:
         if meta.pop("selection", None) is not None:  # never show an old result beside half-rebuilt files
             db.update(job_id, meta=meta)
         p = meta["proxy"]
-        meta["selection"] = reid.finish(job_dir, p["width"], p["height"],
+        meta["selection"] = reid.finish(job_dir, p["width"], p["height"], _fps(meta),
                                         on_progress=lambda x: db.update(job_id, progress=round(x, 3)))
         db.update(job_id, status="ready", progress=1.0, meta=meta)
     except Exception as e:
@@ -218,7 +333,8 @@ def _windows(job: dict, job_dir: Path, start: float, seconds: float | None) -> l
     rms_file = job_dir / "audio_rms.json"
     return events.candidate_windows(dict(np.load(job_dir / "player.npz")), {"t": tr["t"][bm], "xyxy": tr["xyxy"][bm]},
                                     json.loads(rms_file.read_text()) if rms_file.exists() else [],
-                                    job["meta"]["proxy"]["duration_sec"], start=start, seconds=seconds)
+                                    job["meta"]["proxy"]["duration_sec"], _fps(job["meta"]),
+                                    start=start, seconds=seconds)
 
 
 @app.get("/api/jobs/{job_id}/plays/estimate")
@@ -288,14 +404,6 @@ def debug_player(job_id: str):
     path = db.DATA_DIR / job_id / "debug_player.mp4"
     if _job(job_id)["status"] != "ready" or not path.exists():
         raise HTTPException(409, "player video not ready")
-    return FileResponse(path, media_type="video/mp4", headers=NO_STORE)
-
-
-@app.get("/api/jobs/{job_id}/debug")
-def debug_video(job_id: str):
-    path = db.DATA_DIR / job_id / "debug_tracks.mp4"
-    if _job(job_id)["status"] != "ready" or not path.exists():
-        raise HTTPException(409, "debug video not ready")
     return FileResponse(path, media_type="video/mp4", headers=NO_STORE)
 
 
