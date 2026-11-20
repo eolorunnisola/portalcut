@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PortalCut</title>
+<style>
+  :root { --bg:#f7f7f8; --card:#fff; --text:#18181b; --muted:#71717a; --line:#e4e4e7; --accent:#ea580c; --bad:#dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111113; --card:#1c1c1f; --text:#f4f4f5; --muted:#a1a1aa; --line:#2e2e33; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:860px; margin:0 auto; padding:32px 16px; }
+  h1 { margin:0 0 4px; font-size:24px; }
+  .sub { color:var(--muted); margin:0 0 24px; }
+  #drop { border:2px dashed var(--line); border-radius:12px; padding:40px 16px; text-align:center; background:var(--card); cursor:pointer; }
+  #drop.over { border-color:var(--accent); }
+  #drop:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:8px; }
+  .bar > div { height:100%; background:var(--accent); width:0; transition:width .3s; }
+  .job { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-top:16px; }
+  .job h3 { margin:0; font-size:16px; word-break:break-all; }
+  .head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .remove { flex:none; font:inherit; font-size:13px; color:var(--bad); background:none; border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; }
+  .remove:hover { border-color:var(--bad); }
+  .remove:disabled { opacity:.5; cursor:default; }
+  .status { color:var(--muted); font-size:13px; }
+  .failed { color:var(--bad); }
+  dl { display:grid; grid-template-columns:max-content 1fr; gap:2px 16px; margin:12px 0 0; font-size:13px; }
+  dt { color:var(--muted); }
+  video { width:100%; margin-top:12px; border-radius:8px; background:#000; }
+  h4 { margin:20px 0 4px; font-size:15px; }
+  .btn { font:inherit; font-size:14px; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn:focus-visible, .box:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .frames { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:8px; margin-top:12px; }
+  .fr { position:relative; line-height:0; border-radius:6px; overflow:hidden; background:#000; }
+  .fr img { width:100%; height:auto; }
+  .box { position:absolute; padding:0; background:transparent; border:2px solid rgba(255,255,255,.75); border-radius:3px; cursor:pointer; }
+  .box:hover { border-color:var(--accent); background:rgba(234,88,12,.15); }
+  .box.pos { border:3px solid var(--accent); background:rgba(234,88,12,.25); }
+  .box.acc { border:2px dashed var(--accent); }
+  .box.neg { border-color:rgba(255,255,255,.25); }
+  .qs { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; }
+  .qs h4 { grid-column:1/-1; margin-bottom:0; }
+  .q { border:1px solid var(--line); border-radius:8px; padding:8px; }
+  .q img { width:100%; height:140px; object-fit:contain; background:#000; border-radius:4px; }
+  .q .actions { margin-top:8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PortalCut</h1>
+  <p class="sub">Drop a basketball game video to start. It stays on this computer.</p>
+
+  <div id="drop" tabindex="0" role="button" aria-label="Choose a game video to upload">
+    <strong>Drop a game video here</strong> or click to choose (MP4, MOV, M4V, MKV)
+    <div id="up" hidden><div class="status" id="upText"></div><div class="bar"><div id="upBar"></div></div></div>
+  </div>
+  <input type="file" id="file" accept=".mp4,.mov,.m4v,.mkv" hidden>
+
+  <section id="jobs" aria-live="polite"></section>
+</main>
+<script>
+const drop = document.getElementById('drop'), input = document.getElementById('file');
+drop.onclick = () => input.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+input.onchange = () => { if (input.files[0]) upload(input.files[0]); input.value = ''; };
+
+function upload(file) {
+  // XHR rather than fetch: fetch can't report upload progress, and game files are huge.
+  const xhr = new XMLHttpRequest();
+  document.getElementById('up').hidden = false;
+  const text = document.getElementById('upText'), bar = document.getElementById('upBar');
+  xhr.upload.onprogress = e => {
+    const p = e.loaded / e.total;
+    bar.style.width = (p * 100) + '%';
+    text.textContent = `Uploading ${file.name}: ${(p * 100).toFixed(0)}%`;
+  };
+  xhr.onload = () => {
+    text.textContent = xhr.status === 200 ? 'Uploaded. Processing below.' : `Upload failed: ${xhr.responseText}`;
+    refresh();
+  };
+  xhr.onerror = () => { text.textContent = 'Upload failed: network error'; };
+  xhr.open('POST', '/api/jobs?filename=' + encodeURIComponent(file.name));
+  xhr.send(file);
+}
+
+const LABEL = { uploaded:'Queued', probing:'Reading video', making_proxy:'Making 720p proxy', audio:'Analysing audio',
+  ingested:'Waiting to track players', tracking:'Tracking players and ball', debug_video:'Drawing debug video', features:'Learning what each player looks like',
+  selecting:'Building your player view', ready:'Ready', failed:'Failed' };
+const fmtTime = s => new Date(s * 1000).toISOString().substring(11, 19);
+
+function el(tag, attrs = {}, text) {
+  const e = document.createElement(tag);
+  Object.assign(e, attrs);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function render(job) {
+  let card = document.getElementById('job-' + job.id);
+  if (!card) { card = el('div', { className: 'job', id: 'job-' + job.id }); jobsEl.append(card); }
+  if (card.dataset.final) return;  // don't rebuild finished cards (keeps the video player playing)
+  card.replaceChildren();
+  const head = el('div', { className: 'head' });
+  head.append(el('h3', {}, job.filename));
+  if (['ready', 'failed'].includes(job.status)) {
+    const btn = el('button', { className: 'remove', type: 'button' }, 'Remove');
+    btn.setAttribute('aria-label', `Remove ${job.filename}`);
+    btn.onclick = () => remove(job, card, btn);
+    head.append(btn);
+  }
+  card.append(head);
+  const st = el('div', { className: 'status' + (job.status === 'failed' ? ' failed' : '') },
+    (LABEL[job.status] || job.status) + (job.status === 'failed' ? `: ${job.error}` :
+      job.status === 'ready' ? '' : ` (${Math.round(job.progress * 100)}%)`));
+  card.append(st);
+  if (!['ready', 'failed'].includes(job.status)) {
+    const b = el('div', { className: 'bar' }); const f = el('div'); f.style.width = (job.progress * 100) + '%';
+    b.append(f); card.append(b);
+  }
+  const m = job.meta;
+  if (m) {
+    const dl = el('dl');
+    const rows = [['Duration', fmtTime(m.duration_sec)], ['Source', `${m.width}×${m.height} @ ${m.fps} fps, ${m.video_codec}`],
+      ['Size', (m.size_bytes / 1e9).toFixed(2) + ' GB'], ['Audio', m.has_audio ? 'yes' : 'none']];
+    if (m.proxy) rows.push(['Proxy', `${m.proxy.width}×${m.proxy.height} @ ${m.proxy.fps} fps`],
+      ['Processing time', m.ingest_cpu_seconds + ' s'], ['Cost', '$' + m.cost_usd.toFixed(2)]);
+    const t = m.tracking;
+    if (t) rows.push(['Tracking', `${t.seconds} s (${t.x_realtime}× real time) on ${t.device}, ${t.sample_fps} frames/s`],
+      ['Found', `${t.tracks} player tracks, ${t.people_per_frame} people per frame, ball in ${t.ball_found_pct}% of frames`]);
+    for (const [k, v] of rows) dl.append(el('dt', {}, k), el('dd', { style: 'margin:0' }, v));
+    card.append(dl);
+  }
+  if (job.status === 'ready' && m && m.selection) {
+    const x = m.selection;
+    card.append(el('h4', {}, 'Your player'));
+    card.append(el('div', { className: 'status' },
+      `Found in ${x.coverage_pct}% of sampled frames (${x.minutes_visible} min), across ${x.accepted.length} track pieces. ` +
+      `You confirmed ${x.confirmed.length}, rejected ${x.rejected.length}.`));
+    card.append(el('video', { src: `/api/jobs/${job.id}/debug_player`, controls: true, preload: 'metadata' }));
+    card.append(el('div', { className: 'status' }, 'Check: the orange "you" box should follow only your player (first 2 minutes).'));
+    card.append(actionButton('Change selection', async () => {
+      await post(`/api/jobs/${job.id}/select/reset`); delete card.dataset.final; refresh();
+    }));
+  } else if (job.status === 'ready' && m && m.features) {
+    selectPanel(job, card);
+    const d = el('details', { style: 'margin-top:16px' });
+    d.append(el('summary', { className: 'status' }, 'Tracking check (first 60 s, all players; yellow circle = ball)'));
+    d.append(el('video', { src: `/api/jobs/${job.id}/debug`, controls: true, preload: 'none' }));
+    card.append(d);
+  } else if (job.status === 'ready') {
+    card.append(el('video', { src: `/api/jobs/${job.id}/proxy`, controls: true, preload: 'metadata' }));
+  }
+  if (['ready', 'failed'].includes(job.status) && m && m.proxy && !m.features) {
+    card.append(actionButton('Run player tracking', async () => {
+      await post(`/api/jobs/${job.id}/track`); delete card.dataset.final; refresh();
+    }));
+  }
+  if (['ready', 'failed'].includes(job.status)) card.dataset.final = '1';
+}
+
+async function post(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+  const data = await r.json();
+  if (!r.ok) { alert(data.detail || 'Something went wrong'); throw new Error(data.detail); }
+  return data;
+}
+
+function actionButton(text, onclick, primary) {
+  const b = el('button', { className: primary ? 'btn primary' : 'btn', type: 'button' }, text);
+  b.onclick = async () => { b.disabled = true; try { await onclick(); } finally { b.disabled = false; } };
+  return b;
+}
+
+// Click-to-select: frames with clickable player boxes, then "Is this you?" cards for uncertain matches.
+async function selectPanel(job, card) {
+  const panel = el('section', { className: 'pick' });
+  card.append(panel);
+  const { width: W, height: H } = job.meta.proxy;
+  const data = await (await fetch(`/api/jobs/${job.id}/select`)).json();
+  panel.append(el('h4', {}, 'Select your player'));
+  panel.append(el('div', { className: 'status' }, 'Click your player in one or more frames. Then answer the "Is this you?" questions below.'));
+  const grid = el('div', { className: 'frames' });
+  panel.append(grid);
+  const boxes = [];
+  for (const f of data.frames) {
+    const fr = el('div', { className: 'fr' });
+    fr.append(el('img', { src: `/api/jobs/${job.id}/frames/${f.frame}`, alt: `Game frame ${f.frame}`, loading: 'lazy' }));
+    for (const b of f.boxes) {
+      const [x1, y1, x2, y2] = b.xyxy;
+      const btn = el('button', { className: 'box', type: 'button' });
+      Object.assign(btn.style, { left: (100 * x1 / W) + '%', top: (100 * y1 / H) + '%', width: (100 * (x2 - x1) / W) + '%', height: (100 * (y2 - y1) / H) + '%' });
+      btn.dataset.track = b.track_id;
+      btn.onclick = () => answer(b.track_id, !summary.confirmed.includes(b.track_id));
+      fr.append(btn); boxes.push(btn);
+    }
+    grid.append(fr);
+  }
+  const sum = el('div', { className: 'status', style: 'margin-top:12px' });
+  sum.setAttribute('aria-live', 'polite');
+  const qs = el('div', { className: 'qs' });
+  const actions = el('div', { className: 'actions' });
+  actions.append(
+    actionButton('Done: build my player view', async () => {
+      await post(`/api/jobs/${job.id}/select/done`); delete card.dataset.final; refresh();
+    }, true),
+    actionButton('Start over', async () => show((await post(`/api/jobs/${job.id}/select/reset`)).summary)));
+  panel.append(sum, qs, actions);
+
+  let summary;
+  async function answer(track_id, yes) {
+    show((await post(`/api/jobs/${job.id}/select/answer`, { track_id, yes })).summary);
+  }
+  function show(s) {
+    summary = s;
+    for (const b of boxes) {
+      const t = +b.dataset.track;
+      b.className = 'box' + (s.confirmed.includes(t) ? ' pos' : s.accepted.includes(t) ? ' acc' : s.rejected.includes(t) ? ' neg' : '');
+      b.setAttribute('aria-label', (s.confirmed.includes(t) ? 'Unselect' : 'Select') + ` player (track ${t})`);
+    }
+    sum.textContent = s.confirmed.length
+      ? `Matched in ${s.coverage_pct}% of frames (${s.minutes_visible} min). ${s.uncertain_total} unsure match${s.uncertain_total === 1 ? '' : 'es'} left.`
+      : 'No player selected yet.';
+    qs.replaceChildren();
+    if (s.confirmed.length && s.questions.length) {
+      qs.append(el('h4', {}, 'Is this you?'));
+      for (const t of s.questions) {
+        const q = el('div', { className: 'q' });
+        q.append(el('img', { src: `/api/jobs/${job.id}/crops/${t}`, alt: `Possible match, track ${t}` }));
+        const btns = el('div', { className: 'actions' });
+        btns.append(actionButton('Yes, me', () => answer(t, true), true), actionButton('No', () => answer(t, false)));
+        q.append(btns); qs.append(q);
+      }
+    }
+  }
+  show(data.summary);
+}
+
+async function remove(job, card, btn) {
+  if (!confirm(`Remove "${job.filename}"? This deletes the video and its processed files from this computer.`)) return;
+  btn.disabled = true;
+  const r = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
+  if (r.ok) card.remove();
+  else { btn.disabled = false; alert('Could not remove: ' + (await r.json()).detail); }
+}
+
+const jobsEl = document.getElementById('jobs');
+async function refresh() {
+  const jobs = await (await fetch('/api/jobs')).json();
+  for (const j of jobs) { render(j); jobsEl.append(document.getElementById('job-' + j.id)); }  // API order = newest first
+}
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
