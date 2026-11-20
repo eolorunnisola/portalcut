@@ -47,6 +47,12 @@
   .q { border:1px solid var(--line); border-radius:8px; padding:8px; }
   .q img { width:100%; height:140px; object-fit:contain; background:#000; border-radius:4px; }
   .q .actions { margin-top:8px; }
+  .playlist { list-style:none; padding:0; margin:8px 0 0; display:grid; gap:4px; }
+  .play { width:100%; display:grid; grid-template-columns:48px 130px 1fr; gap:8px; align-items:baseline; text-align:left;
+    font:inherit; font-size:14px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); cursor:pointer; }
+  .play:hover, .play:focus-visible { border-color:var(--accent); outline:none; }
+  .play .t { font-variant-numeric:tabular-nums; color:var(--muted); }
+  @media (max-width:560px) { .play { grid-template-columns:44px 1fr; } .play .status { grid-column:1/-1; } }
 </style>
 </head>
 <body>
@@ -92,7 +98,10 @@ function upload(file) {
 
 const LABEL = { uploaded:'Queued', probing:'Reading video', making_proxy:'Making 720p proxy', audio:'Analysing audio',
   ingested:'Waiting to track players', tracking:'Tracking players and ball', debug_video:'Drawing debug video', features:'Learning what each player looks like',
-  selecting:'Building your player view', ready:'Ready', failed:'Failed' };
+  selecting:'Building your player view (following you through clumps)', reading_numbers:'Reading jersey numbers', finding_plays:'Finding plays with Claude', ready:'Ready', failed:'Failed' };
+const PLAY = { made_shot:'Made shot', missed_shot:'Missed shot', assist:'Assist', steal:'Steal', block:'Block',
+  rebound:'Rebound', drive:'Drive', possession:'Has the ball', defensive_stop:'Defensive stop' };
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const fmtTime = s => new Date(s * 1000).toISOString().substring(11, 19);
 
 function el(tag, attrs = {}, text) {
@@ -120,6 +129,7 @@ function render(job) {
     (LABEL[job.status] || job.status) + (job.status === 'failed' ? `: ${job.error}` :
       job.status === 'ready' ? '' : ` (${Math.round(job.progress * 100)}%)`));
   card.append(st);
+  if (job.status === 'ready' && job.error) card.append(el('div', { className: 'status failed' }, job.error));
   if (!['ready', 'failed'].includes(job.status)) {
     const b = el('div', { className: 'bar' }); const f = el('div'); f.style.width = (job.progress * 100) + '%';
     b.append(f); card.append(b);
@@ -148,6 +158,7 @@ function render(job) {
     card.append(actionButton('Change selection', async () => {
       await post(`/api/jobs/${job.id}/select/reset`); delete card.dataset.final; refresh();
     }));
+    playsPanel(job, card);
   } else if (job.status === 'ready' && m && m.features) {
     selectPanel(job, card);
     const d = el('details', { style: 'margin-top:16px' });
@@ -211,6 +222,12 @@ async function selectPanel(job, card) {
       await post(`/api/jobs/${job.id}/select/done`); delete card.dataset.final; refresh();
     }, true),
     actionButton('Start over', async () => show((await post(`/api/jobs/${job.id}/select/reset`)).summary)));
+  const nb = data.numbers;
+  if (!data.summary.numbers_read && nb.api_key && nb.tracks) {  // jersey numbers separate same-jersey teammates
+    actions.append(actionButton(`Read jersey numbers (about $${nb.estimate_usd.toFixed(2)})`, async () => {
+      await post(`/api/jobs/${job.id}/numbers`); delete card.dataset.final; refresh();
+    }));
+  }
   panel.append(sum, qs, actions);
 
   let summary;
@@ -230,7 +247,8 @@ async function selectPanel(job, card) {
       b.setAttribute('aria-label', (s.confirmed.includes(t) ? 'Unselect' : 'Select') + ` player (track ${t})`);
     }
     sum.textContent = s.confirmed.length
-      ? `Matched in ${s.coverage_pct}% of frames (${s.minutes_visible} min). ${s.uncertain_total} unsure match${s.uncertain_total === 1 ? '' : 'es'} left.`
+      ? (s.number ? `You: #${s.number}. ` : s.numbers_read ? 'Your number is not readable yet. ' : '') +
+        `Matched in ${s.coverage_pct}% of frames (${s.minutes_visible} min). ${s.uncertain_total} unsure match${s.uncertain_total === 1 ? '' : 'es'} left.`
       : 'No player selected yet.';
     qs.replaceChildren();
     if (s.confirmed.length && s.questions.length) {
@@ -245,6 +263,44 @@ async function selectPanel(job, card) {
     }
   }
   show(data.summary);
+}
+
+// Plays found by Claude: summary, a list that jumps the video to each play, and the button to run it.
+async function playsPanel(job, card) {
+  const panel = el('section', { className: 'plays' });
+  card.append(panel);
+  panel.append(el('h4', {}, 'Plays'));
+  const p = job.meta.plays;
+  const start = async () => { await post(`/api/jobs/${job.id}/plays`, {}); delete card.dataset.final; refresh(); };
+  if (p) {
+    const types = Object.entries(p.by_type).map(([k, n]) => `${n} ${PLAY[k] || k}`).join(', ') || 'none';
+    panel.append(el('div', { className: 'status' },
+      `${p.events} plays (${types}). Cost $${p.cost_usd.toFixed(3)}: ${p.api_calls} Claude calls, ${p.cached_calls} from cache, ` +
+      `${p.escalations} second opinions. ${p.windows_sent} of ${p.windows_found} moments checked.` +
+      (p.skipped_over_budget ? ` Budget ran out: ${p.skipped_over_budget} checks skipped.` : '')));
+    const video = el('video', { src: `/api/jobs/${job.id}/proxy`, controls: true, preload: 'metadata' });
+    const list = el('ol', { className: 'playlist' });
+    for (const e of await (await fetch(`/api/jobs/${job.id}/plays`)).json()) {
+      const b = el('button', { type: 'button', className: 'play' });
+      b.append(el('span', { className: 't' }, mmss(e.t_start)), el('strong', {}, PLAY[e.type] || e.type),
+        el('span', { className: 'status' }, `${Math.round(e.confidence * 100)}% · ${e.model.includes('sonnet') ? 'Sonnet' : 'Haiku'} · ${e.reason}`));
+      b.onclick = () => { video.currentTime = Math.max(0, e.t_start - 2); video.play(); };
+      const li = el('li');
+      li.append(b);
+      list.append(li);
+    }
+    panel.append(video, list, actionButton('Find plays again', start));  // video first, so a click shows the play
+    return;
+  }
+  const est = await (await fetch(`/api/jobs/${job.id}/plays/estimate`)).json();
+  if (!est.api_key) {
+    panel.append(el('div', { className: 'status' },
+      'To find plays, add a line ANTHROPIC_API_KEY=your-key to a file named .env in the project folder, then restart the app.'));
+    return;
+  }
+  panel.append(el('div', { className: 'status' },
+    `Claude will check ${est.windows} moments where your player is on screen: about $${est.estimate_usd.toFixed(2)}, never more than $${est.budget_usd.toFixed(2)}.`));
+  panel.append(actionButton('Find plays', start, true));
 }
 
 async function remove(job, card, btn) {

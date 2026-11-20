@@ -1,0 +1,166 @@
+{
+ "video": "ScreenRecording_11-20-2026 13-06-19_1.mov (UConn vs Arizona broadcast, phone screen recording)",
+ "status": "DRAFT: labelled by AI from 2 fps frames, spot-checked at 116 s and 421 s; needs a human pass",
+ "segment": [
+  0,
+  882
+ ],
+ "ignore": [
+  [
+   39.5,
+   59.4
+  ],
+  [
+   66.0,
+   86.5
+  ],
+  [
+   162.0,
+   220.0
+  ],
+  [
+   280.5,
+   292
+  ],
+  [
+   324,
+   346
+  ],
+  [
+   346,
+   356
+  ],
+  [
+   373,
+   375.5
+  ],
+  [
+   384,
+   386.5
+  ],
+  [
+   424.5,
+   431
+  ],
+  [
+   450.5,
+   453
+  ],
+  [
+   466,
+   478.5
+  ],
+  [
+   488.5,
+   498
+  ],
+  [
+   498,
+   506
+  ],
+  [
+   506,
+   516.5
+  ],
+  [
+   521.5,
+   538
+  ],
+  [
+   570,
+   589
+  ],
+  [
+   592,
+   607
+  ],
+  [
+   607,
+   615
+  ],
+  [
+   615,
+   618
+  ],
+  [
+   617.5,
+   621
+  ],
+  [
+   637.5,
+   647.5
+  ],
+  [
+   648,
+   660
+  ],
+  [
+   660,
+   667.5
+  ],
+  [
+   679.5,
+   680.5
+  ],
+  [
+   693,
+   704.5
+  ],
+  [
+   750,
+   757
+  ],
+  [
+   757,
+   772.5
+  ],
+  [
+   795.5,
+   799.5
+  ],
+  [
+   799.5,
+   802.5
+  ],
+  [
+   802.5,
+   810.5
+  ],
+  [
+   819.5,
+   822
+  ],
+  [
+   839,
+   844
+  ],
+  [
+   877.5,
+   882
+  ]
+ ],
+ "unlogged_unclear": "about 15 ambiguous moments were left out on purpose (scrums, plays hidden by cuts)",
+ "player": "Arizona #13 (Krivas)",
+ "plays": [
+  {
+   "t": 38.3,
+   "type": "missed_shot",
+   "subtype": null,
+   "team": "Arizona",
+   "jersey": "13",
+   "score_after": null,
+   "certainty": "medium",
+   "note": "Krivas shot with UConn foul; clock stops, score stays 0-5"
+  },
+  {
+   "t": 421.0,
+   "type": "made_shot",
+   "subtype": "dunk",
+   "team": "Arizona",
+   "jersey": "13",
+   "score_after": "19-38",
+   "certainty": "medium",
+   "note": "Krivas dunk at left rim; scoreboard 36 to 38 ~3s later"
+  }
+ ]
+}

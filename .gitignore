@@ -3,3 +3,7 @@ data/
 .venv/
 __pycache__/
 *.pyc
+*.mov
+*.mp4
+*.m4v
+*.mkv

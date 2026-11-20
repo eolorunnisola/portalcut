@@ -30,7 +30,8 @@ def init() -> None:
             )"""
         )
         # Building the player view only reads finished tracking, so an interrupted one can simply be redone.
-        c.execute("UPDATE jobs SET status='ready', progress=1 WHERE status='selecting'")
+        # Same for finding plays: answers already paid for are cached, so a re-run is cheap.
+        c.execute("UPDATE jobs SET status='ready', progress=1 WHERE status IN ('selecting', 'finding_plays', 'reading_numbers')")
         # A job left mid-ingest by a server restart will never finish; say so instead of spinning forever.
         c.execute(
             "UPDATE jobs SET status='failed', error='interrupted by server restart' "

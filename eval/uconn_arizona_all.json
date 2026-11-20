@@ -1,0 +1,316 @@
+{
+ "video": "ScreenRecording_11-20-2026 13-06-19_1.mov (UConn vs Arizona broadcast, phone screen recording)",
+ "status": "DRAFT: labelled by AI from 2 fps frames, spot-checked at 116 s and 421 s; needs a human pass",
+ "segment": [
+  0,
+  882
+ ],
+ "ignore": [
+  [
+   39.5,
+   59.4
+  ],
+  [
+   66.0,
+   86.5
+  ],
+  [
+   162.0,
+   220.0
+  ],
+  [
+   280.5,
+   292
+  ],
+  [
+   324,
+   346
+  ],
+  [
+   346,
+   356
+  ],
+  [
+   373,
+   375.5
+  ],
+  [
+   384,
+   386.5
+  ],
+  [
+   424.5,
+   431
+  ],
+  [
+   450.5,
+   453
+  ],
+  [
+   466,
+   478.5
+  ],
+  [
+   488.5,
+   498
+  ],
+  [
+   498,
+   506
+  ],
+  [
+   506,
+   516.5
+  ],
+  [
+   521.5,
+   538
+  ],
+  [
+   570,
+   589
+  ],
+  [
+   592,
+   607
+  ],
+  [
+   607,
+   615
+  ],
+  [
+   615,
+   618
+  ],
+  [
+   617.5,
+   621
+  ],
+  [
+   637.5,
+   647.5
+  ],
+  [
+   648,
+   660
+  ],
+  [
+   660,
+   667.5
+  ],
+  [
+   679.5,
+   680.5
+  ],
+  [
+   693,
+   704.5
+  ],
+  [
+   750,
+   757
+  ],
+  [
+   757,
+   772.5
+  ],
+  [
+   795.5,
+   799.5
+  ],
+  [
+   799.5,
+   802.5
+  ],
+  [
+   802.5,
+   810.5
+  ],
+  [
+   819.5,
+   822
+  ],
+  [
+   839,
+   844
+  ],
+  [
+   877.5,
+   882
+  ]
+ ],
+ "unlogged_unclear": "about 15 ambiguous moments were left out on purpose (scrums, plays hidden by cuts)",
+ "player": "all",
+ "plays": [
+  {
+   "t": 9.4,
+   "type": "missed_shot",
+   "subtype": null,
+   "team": "Arizona",
+   "jersey": "?",
+   "score_after": null,
+   "certainty": "low",
+   "note": "close attempt at left basket amid scrum, no score change"
+  },
+  {
+   "t": 11.8,
+   "type": "rebound",
+   "subtype": "defensive",
+   "team": "UConn",
+   "jersey": "?",
+   "score_after": null,
+   "certainty": "low",
+   "note": "UConn controls loose ball after Arizona miss, then pushes"
+  },
+  {
+   "t": 16.6,
+   "type": "missed_shot",
+   "subtype": null,
+   "team": "UConn",
+   "jersey": "?",
+   "score_after": null,
+   "certainty": "low",
+   "note": "UConn perimeter jumper at far basket, no score change"
+  },
+  {
+   "t": 18.5,
+   "type": "rebound",
+   "subtype": "defensive",
+   "team": "Arizona",
+   "jersey": "?",
+   "score_after": null,
+   "certainty": "low",
+   "note": "Arizona player secures ball under basket, then outlets"
+  },
+  {
+   "t": 38.3,
+   "type": "missed_shot",
+   "subtype": null,
+   "team": "Arizona",
+   "jersey": "13",
+   "score_after": null,
+   "certainty": "medium",
+   "note": "Krivas shot with UConn foul; clock stops, score stays 0-5"
+  },
+  {
+   "t": 116.3,
+   "type": "missed_shot",
+   "subtype": "three",
+   "team": "Arizona",
+   "jersey": "?",
+   "score_after": null,
+   "certainty": "low",
+   "note": "wing shot, scrum under basket follows, score stays 3-10"
+  },
+  {
+   "t": 161.0,
+   "type": "missed_shot",
+   "subtype": "dunk",
+   "team": "Arizona",
+   "jersey": "35",
+   "score_after": null,
+   "certainty": "medium",
+   "note": "Brnovic attacks rim, falls, UConn 5th foul; score stays 9-24"
+  },
+  {
+   "t": 224.0,
+   "type": "missed_shot",
+   "subtype": "free_throw",
+   "team": "Arizona",
+   "jersey": "35",
+   "score_after": null,
+   "certainty": "medium",
+   "note": "FT bounces off rim, score stays 9-24, clock restarts"
+  },
+  {
+   "t": 314.25,
+   "type": "missed_shot",
+   "subtype": "jumper",
+   "team": "Arizona",
+   "jersey": "?",
+   "score_after": null,
+   "certainty": "low",
+   "note": "Arizona jumper at far end, score unchanged 24"
+  },
+  {
+   "t": 421.0,
+   "type": "made_shot",
+   "subtype": "dunk",
+   "team": "Arizona",
+   "jersey": "13",
+   "score_after": "19-38",
+   "certainty": "medium",
+   "note": "Krivas dunk at left rim; scoreboard 36 to 38 ~3s later"
+  },
+  {
+   "t": 519.1,
+   "type": "made_shot",
+   "subtype": "free_throw",
+   "team": "UConn",
+   "jersey": "5",
+   "score_after": "21-38",
+   "certainty": "medium",
+   "note": "Demary FT 1 of 2; score 20 to 21 shortly after"
+  },
+  {
+   "t": 542.3,
+   "type": "made_shot",
+   "subtype": "free_throw",
+   "team": "UConn",
+   "jersey": "5",
+   "score_after": "22-38",
+   "certainty": "high",
+   "note": "Demary FT 2 of 2; ball seen in net, 22 shown"
+  },
+  {
+   "t": 590.8,
+   "type": "made_shot",
+   "subtype": "free_throw",
+   "team": "Arizona",
+   "jersey": "3",
+   "score_after": "22-39",
+   "certainty": "high",
+   "note": "Holt 1-and-1 first FT; 39 shown"
+  },
+  {
+   "t": 606.6,
+   "type": "made_shot",
+   "subtype": "free_throw",
+   "team": "Arizona",
+   "jersey": "3",
+   "score_after": "22-40",
+   "certainty": "medium",
+   "note": "Holt second FT; ad overlay hides flight, 40 shown after"
+  },
+  {
+   "t": 728.25,
+   "type": "missed_shot",
+   "subtype": null,
+   "team": "UConn",
+   "jersey": "24",
+   "score_after": null,
+   "certainty": "medium",
+   "note": "Contested attempt at rim rattles around, score unchanged"
+  },
+  {
+   "t": 732.1,
+   "type": "made_shot",
+   "subtype": "dunk",
+   "team": "UConn",
+   "jersey": "9",
+   "score_after": "34-51",
+   "certainty": "high",
+   "note": "Hines putback dunk over Krivas; score 32 to 34, replayed 758+"
+  },
+  {
+   "t": 817.25,
+   "type": "made_shot",
+   "subtype": "free_throw",
+   "team": "UConn",
+   "jersey": "24",
+   "score_after": "35-51",
+   "certainty": "high",
+   "note": "Mullins single FT, score 34 to 35"
+  }
+ ]
+}

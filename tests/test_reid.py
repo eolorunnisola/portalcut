@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 import numpy as np
@@ -77,7 +78,7 @@ def test_finish_writes_one_box_per_frame(job_dir):
     sel.answer(0, True)
     sel.answer(4, True)
     sel.save()
-    out = reid.finish(job_dir, 320, 180)
+    out = reid.finish(job_dir, 320, 180, gap_fill=False)
     p = dict(np.load(job_dir / "player.npz"))
     assert sorted(p["frame"].tolist()) == list(range(30))  # one row per frame, no duplicates
     assert set(p["track_id"].tolist()) <= {0, 2, 4, 5}
@@ -238,11 +239,11 @@ def test_each_rebuild_gets_a_new_video_version(job_dir):
     sel = reid.Selection(job_dir)
     sel.answer(0, True)
     sel.save()
-    first = reid.finish(job_dir, 320, 180)["version"]
+    first = reid.finish(job_dir, 320, 180, gap_fill=False)["version"]
     sel = reid.Selection(job_dir)
     sel.answer(1, True)                                  # switch players, rebuild
     sel.save()
-    assert reid.finish(job_dir, 320, 180)["version"] != first
+    assert reid.finish(job_dir, 320, 180, gap_fill=False)["version"] != first
 
 
 def test_generated_media_is_not_cached(job_dir, tmp_db):
@@ -258,3 +259,88 @@ def test_generated_media_is_not_cached(job_dir, tmp_db):
     for url in ("/api/jobs/nc/debug_player", "/api/jobs/nc/debug", "/api/jobs/nc/frames/0"):
         r = c.get(url)
         assert r.status_code == 200 and "no-store" in r.headers.get("cache-control", ""), url
+
+
+# ---- team colours and jersey numbers ----
+
+def _set_teams(job_dir, team_b=(1, 3)):
+    f = dict(np.load(job_dir / "features.npz"))
+    hist = np.zeros((6, 48), np.float32)
+    for k, tid in enumerate(f["track_id"]):
+        hist[k, 40 if tid in team_b else 3] = 1.0  # two clearly different jersey colours
+    np.savez_compressed(job_dir / "features.npz", **(f | {"hist": hist}))
+
+
+def test_team_clusters_split_two_colours():
+    hist = np.zeros((6, 48), np.float32)
+    hist[[0, 2, 4], 3] = 1
+    hist[[1, 3, 5], 40] = 1
+    lab = reid.team_clusters(hist, np.full(6, 10))
+    assert len(set(lab[[0, 2, 4]])) == 1 and len(set(lab[[1, 3, 5]])) == 1 and lab[0] != lab[1]
+
+
+def test_other_team_is_never_you(job_dir):
+    _set_teams(job_dir, team_b=(1, 3, 4))           # make the ambiguous track 4 wear the other team's colours
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    s = reid.Selection.score(sel)
+    assert 4 in s["neg"] and 4 not in s["uncertain"] and 3 in s["neg"]
+
+
+def test_your_number_accepts_and_another_number_rejects(job_dir):
+    _set_teams(job_dir)
+    (job_dir / "numbers.json").write_text(json.dumps({"0": {"number": "13", "votes": 2}, "4": {"number": "13", "votes": 2},
+                                                      "5": {"number": "7", "votes": 2}, "2": {"number": None}}))
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    s = sel.summary()
+    assert s["number"] == "13"
+    assert 4 in s["accepted"] and 4 not in s["questions"]   # appearance alone was a toss-up (question before)
+    assert 5 not in s["accepted"]                           # looks like you, but wears #7
+    # unreadable number decides nothing: 2 is not rejected; it looks just like #7 (track 5), so it becomes a question
+    assert 2 not in reid.Selection.score(sel)["neg"] and 2 in s["questions"]
+
+
+def test_clicking_a_different_number_switches(job_dir):
+    _set_teams(job_dir)
+    (job_dir / "numbers.json").write_text(json.dumps({"0": {"number": "13"}, "2": {"number": "7"}}))
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    assert sel.answer(2, True) is True and sel.summary()["confirmed"] == [2]
+
+
+def test_other_colour_rejects_even_with_your_number(job_dir):
+    _set_teams(job_dir, team_b=(1, 3, 4))           # real footage: a navy #18 was misread as "13"
+    (job_dir / "numbers.json").write_text(json.dumps({"0": {"number": "13", "votes": 2},
+                                                      "4": {"number": "13", "votes": 3}}))
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    assert 4 not in sel.summary()["accepted"]
+
+
+def test_one_reading_of_your_number_is_not_enough_to_accept(job_dir):
+    (job_dir / "numbers.json").write_text(json.dumps({"0": {"number": "13", "votes": 2},
+                                                      "4": {"number": "13", "votes": 1}}))
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    s = sel.summary()
+    assert 4 not in s["accepted"] and 4 in s["questions"]   # still asked about: appearance is a toss-up
+
+
+def test_finish_merges_gap_filled_frames(job_dir, monkeypatch):
+    from portalcut import gapfill
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=6",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(job_dir / "proxy.mp4")], check=True)
+    def fake_fill(proxy, w, h, player, *a, **k):  # like the real fill: only frames the player lacks
+        missing = [f for f in range(30) if f not in set(player["frame"].tolist())][:2]
+        return {"frame": np.array(missing, np.int32), "t": np.array(missing, np.float32) / 5,
+                "track_id": np.full(2, -2, np.int32), "xyxy": np.tile(np.array([1, 2, 30, 60], np.float32), (2, 1)),
+                "conf": np.full(2, 0.5, np.float32)}, {}
+    monkeypatch.setattr(gapfill, "fill", fake_fill)
+    sel = reid.Selection(job_dir)
+    sel.answer(1, True)                                  # track 1 covers frames 0-9 only
+    sel.save()
+    out = reid.finish(job_dir, 320, 180)
+    p = dict(np.load(job_dir / "player.npz"))
+    assert p["frame"].tolist() == sorted(set(p["frame"].tolist()))   # sorted, one box per frame
+    assert (p["track_id"] == -2).sum() == 2 and out["gap_filled_frames"] == 2
