@@ -112,9 +112,18 @@ class Answer(BaseModel):
 def answer(job_id: str, a: Answer):
     sel = reid.Selection(_ready_for_selection(job_id))
     try:
-        sel.answer(a.track_id, a.yes)
+        switched = sel.answer(a.track_id, a.yes)
     except KeyError:
         raise HTTPException(404, "unknown track")
+    sel.save()
+    return _selection_payload(sel) | {"switched": switched}
+
+
+@app.post("/api/jobs/{job_id}/select/undo")
+def undo_switch(job_id: str):
+    sel = reid.Selection(_ready_for_selection(job_id))
+    if not sel.undo():
+        raise HTTPException(409, "nothing to undo")
     sel.save()
     return _selection_payload(sel)
 

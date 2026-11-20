@@ -185,7 +185,7 @@ async function selectPanel(job, card) {
   const { width: W, height: H } = job.meta.proxy;
   const data = await (await fetch(`/api/jobs/${job.id}/select`)).json();
   panel.append(el('h4', {}, 'Select your player'));
-  panel.append(el('div', { className: 'status' }, 'Click your player in one or more frames. Then answer the "Is this you?" questions below.'));
+  panel.append(el('div', { className: 'status' }, 'Click your player in one or more frames. Click a different player to switch. Then answer the "Is this you?" questions below.'));
   const grid = el('div', { className: 'frames' });
   panel.append(grid);
   const boxes = [];
@@ -215,7 +215,12 @@ async function selectPanel(job, card) {
 
   let summary;
   async function answer(track_id, yes) {
-    show((await post(`/api/jobs/${job.id}/select/answer`, { track_id, yes })).summary);
+    const r = await post(`/api/jobs/${job.id}/select/answer`, { track_id, yes });
+    show(r.summary);
+    if (r.switched) {
+      sum.textContent = 'Switched to the player you clicked. ' + sum.textContent + ' ';
+      sum.append(actionButton('Undo switch', async () => show((await post(`/api/jobs/${job.id}/select/undo`)).summary)));
+    }
   }
   function show(s) {
     summary = s;

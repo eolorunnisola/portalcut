@@ -166,15 +166,45 @@ class Selection:
         s = json.loads(p.read_text()) if p.exists() else {}
         self.pos: set[int] = set(s.get("pos", []))
         self.neg: set[int] = set(s.get("neg", []))
+        self.prev: dict | None = s.get("prev")  # state before the last switch, for undo
 
     def save(self) -> None:
-        (self.dir / "selection.json").write_text(json.dumps({"pos": sorted(self.pos), "neg": sorted(self.neg)}))
+        (self.dir / "selection.json").write_text(
+            json.dumps({"pos": sorted(self.pos), "neg": sorted(self.neg), "prev": self.prev}))
 
-    def answer(self, tid: int, yes: bool) -> None:
+    def undo(self) -> bool:
+        """Go back to the selection before the last switch. Returns False if there is none."""
+        if not self.prev:
+            return False
+        self.pos, self.neg, self.prev = set(self.prev["pos"]), set(self.prev["neg"]), None
+        return True
+
+    def _margin(self, tid: int) -> float:
+        """How much more `tid` looks like your confirmed tracks than like anyone known not to be you."""
+        k = self.index[tid]
+        neg = (set(self.neg) | {t for p in self.pos for t in self._frames_of if t not in self.pos and self.overlaps(p, t)}) - {tid}
+        s_pos = self.sim[k, [self.index[t] for t in self.pos]].max()
+        s_neg = self.sim[k, [self.index[t] for t in neg]].max() if neg else 0.7
+        return float(s_pos - s_neg)
+
+    def answer(self, tid: int, yes: bool) -> bool:
+        """Record a yes/no for one track. Returns True when a yes switched to a different player."""
         if tid not in self.index:
             raise KeyError(tid)
+        if yes and self.pos and tid not in self.pos:
+            clashes = {a for a in self.score()["accepted"] if a != tid and self.overlaps(tid, a)}
+            # On screen with a track you confirmed, or clearly unlike you: you mean a different player.
+            # Start over from this click (undo-able); whoever it replaced on screen is not you.
+            if any(self.overlaps(tid, p) for p in self.pos) or self._margin(tid) < -BAND:
+                self.prev = {"pos": sorted(self.pos), "neg": sorted(self.neg)}
+                self.pos, self.neg = {tid}, clashes
+                return True
+            # Otherwise it's another sighting of you: any automatic match in the same frames was wrong.
+            self.neg = (self.neg | clashes) - {tid}
         (self.pos if yes else self.neg).add(tid)
         (self.neg if yes else self.pos).discard(tid)
+        self.prev = None  # undo only reverses a switch you just made
+        return False
 
     def overlaps(self, a: int, b: int) -> bool:
         return bool(self._frames_of[a] & self._frames_of[b])

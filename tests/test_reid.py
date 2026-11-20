@@ -105,6 +105,55 @@ def test_selection_api(job_dir, tmp_db):
     assert c.get(f"/api/jobs/{jid}/select").status_code == 409      # not ready yet
 
 
+# ---- switching to a different player (audit: clicks used to add a second "you" instead of switching) ----
+
+def test_click_other_player_in_same_frame_switches(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    assert sel.answer(1, True) is True                   # 1 is on screen with 0: you can't be both
+    s = sel.summary()
+    assert s["confirmed"] == [1]
+    assert 0 in s["rejected"]                            # the person you moved off is now "not you"
+    assert 3 in s["accepted"]                            # 3 looks like 1
+    assert not {0, 2, 5} & set(s["accepted"])            # nothing of the old player remains
+
+
+def test_click_other_player_in_another_frame_switches(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    assert 2 in sel.summary()["accepted"]
+    assert sel.answer(3, True) is True                   # 3 shares frames with auto-matched 2
+    s = sel.summary()
+    assert s["confirmed"] == [3] and 2 in s["rejected"]
+    assert 1 in s["accepted"] and not {0, 2, 5} & set(s["accepted"])
+
+
+def test_click_clearly_different_player_switches_even_without_overlap(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    sel.answer(2, False)
+    sel.answer(5, False)                                 # frames 10-19 now have no match
+    assert sel.answer(3, True) is True                   # looks like the other player, not like 0
+    assert sel.summary()["confirmed"] == [3]
+
+
+def test_second_click_on_same_player_adds(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    assert sel.answer(2, True) is False                  # same person in another frame: keep both
+    assert sel.summary()["confirmed"] == [0, 2]
+
+
+def test_api_reports_switch(job_dir, tmp_db):
+    import shutil
+    shutil.copytree(job_dir, db.DATA_DIR / "sw")
+    db.create("sw", "g.mp4")
+    db.update("sw", status="ready", meta={"proxy": {"width": 320, "height": 180}, "features": {"tracks": 6}})
+    c = TestClient(app_mod.app)
+    assert c.post("/api/jobs/sw/select/answer", json={"track_id": 0, "yes": True}).json()["switched"] is False
+    r = c.post("/api/jobs/sw/select/answer", json={"track_id": 1, "yes": True}).json()
+    assert r["switched"] is True and r["summary"]["confirmed"] == [1]
+
 
 def test_restart_during_selection_keeps_job_usable(tmp_db):
     db.create("s", "g.mp4")
@@ -116,6 +165,51 @@ def test_restart_during_selection_keeps_job_usable(tmp_db):
     assert db.get("t")["status"] == "failed"
 
 
+# ---- independent review: switching must not throw away the user's own answers ----
+
+def test_yes_on_other_piece_of_you_corrects_instead_of_wiping(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)                                  # auto-matches 2
+    assert sel.answer(5, True) is False                  # 5 also looks like you and shares frames with 2
+    s = sel.summary()
+    assert s["confirmed"] == [0, 5]                      # earlier confirmation kept
+    assert 2 in s["rejected"] and 2 not in s["accepted"]  # you said 5, so 2 (same frames) is someone else
+
+
+def test_no_then_yes_flips_one_track(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    sel.answer(4, False)
+    assert sel.answer(4, True) is False
+    s = sel.summary()
+    assert s["confirmed"] == [0, 4] and s["rejected"] == []
+
+
+def test_switch_can_be_undone(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    sel.answer(2, True)
+    assert sel.answer(1, True) is True                   # switch to the other player
+    sel.save()
+    sel = reid.Selection(job_dir)                        # survives a reload
+    assert sel.undo() is True
+    assert sel.summary()["confirmed"] == [0, 2]
+    assert sel.undo() is False                           # nothing more to undo
+
+
+def test_api_undo(job_dir, tmp_db):
+    import shutil
+    shutil.copytree(job_dir, db.DATA_DIR / "un")
+    db.create("un", "g.mp4")
+    db.update("un", status="ready", meta={"proxy": {"width": 320, "height": 180}, "features": {"tracks": 6}})
+    c = TestClient(app_mod.app)
+    c.post("/api/jobs/un/select/answer", json={"track_id": 0, "yes": True})
+    c.post("/api/jobs/un/select/answer", json={"track_id": 1, "yes": True})
+    r = c.post("/api/jobs/un/select/undo").json()
+    assert r["summary"]["confirmed"] == [0]
+    assert c.post("/api/jobs/un/select/undo").status_code == 409
+
+
 def test_finish_clears_old_result_before_rebuilding(job_dir, tmp_db, monkeypatch):
     import shutil
     shutil.copytree(job_dir, db.DATA_DIR / "fx")
@@ -125,3 +219,12 @@ def test_finish_clears_old_result_before_rebuilding(job_dir, tmp_db, monkeypatch
     with pytest.raises(KeyboardInterrupt):               # simulate the server dying mid-build
         app_mod._finish("fx", db.DATA_DIR / "fx")
     assert "selection" not in db.get("fx")["meta"]       # old result is not shown next to half-written files
+
+
+def test_undo_only_right_after_a_switch(job_dir):
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    sel.answer(1, True)                                  # switch
+    sel.answer(3, True)                                  # a later answer
+    assert sel.undo() is False                           # undo would silently drop that answer
+    assert sel.summary()["confirmed"] == [1, 3]
