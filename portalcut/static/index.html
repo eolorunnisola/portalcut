@@ -143,7 +143,7 @@ function render(job) {
     card.append(el('div', { className: 'status' },
       `Found in ${x.coverage_pct}% of sampled frames (${x.minutes_visible} min), across ${x.accepted.length} track pieces. ` +
       `You confirmed ${x.confirmed.length}, rejected ${x.rejected.length}.`));
-    card.append(el('video', { src: `/api/jobs/${job.id}/debug_player`, controls: true, preload: 'metadata' }));
+    card.append(el('video', { src: `/api/jobs/${job.id}/debug_player?v=${x.version || 0}`, controls: true, preload: 'metadata' }));
     card.append(el('div', { className: 'status' }, 'Check: the orange "you" box should follow only your player (first 2 minutes).'));
     card.append(actionButton('Change selection', async () => {
       await post(`/api/jobs/${job.id}/select/reset`); delete card.dataset.final; refresh();

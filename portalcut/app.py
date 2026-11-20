@@ -170,10 +170,13 @@ def crop_image(job_id: str, track_id: int):
     return _image(db.DATA_DIR / _job(job_id)["id"] / "crops" / f"{track_id}.jpg")
 
 
+NO_STORE = {"Cache-Control": "no-store"}  # these files are rebuilt in place; a cached copy would be stale
+
+
 def _image(path: Path):
     if not path.exists():  # path parts are ints or a job id from the database: no traversal possible
         raise HTTPException(404, "image not found")
-    return FileResponse(path, media_type="image/jpeg")
+    return FileResponse(path, media_type="image/jpeg", headers=NO_STORE)
 
 
 @app.get("/api/jobs/{job_id}/debug_player")
@@ -181,7 +184,7 @@ def debug_player(job_id: str):
     path = db.DATA_DIR / job_id / "debug_player.mp4"
     if _job(job_id)["status"] != "ready" or not path.exists():
         raise HTTPException(409, "player video not ready")
-    return FileResponse(path, media_type="video/mp4")
+    return FileResponse(path, media_type="video/mp4", headers=NO_STORE)
 
 
 @app.get("/api/jobs/{job_id}/debug")
@@ -189,7 +192,7 @@ def debug_video(job_id: str):
     path = db.DATA_DIR / job_id / "debug_tracks.mp4"
     if _job(job_id)["status"] != "ready" or not path.exists():
         raise HTTPException(409, "debug video not ready")
-    return FileResponse(path, media_type="video/mp4")
+    return FileResponse(path, media_type="video/mp4", headers=NO_STORE)
 
 
 @app.get("/api/jobs/{job_id}/proxy")

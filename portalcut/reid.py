@@ -286,4 +286,5 @@ def finish(job_dir: Path, w: int, h: int, fps: float = track.SAMPLE_FPS) -> dict
     track.debug_video(job_dir / "proxy.mp4", {k: v[keep] for k, v in rows.items()}, w, h, fps,
                       job_dir / "debug_player.mp4", seconds=PLAYER_DEBUG_SECONDS, label="you")
     summary.pop("questions")
-    return summary | {"seconds": round(time.time() - t0, 1)}
+    # version changes on every rebuild so the page asks for the new video instead of a cached old one
+    return summary | {"seconds": round(time.time() - t0, 1), "version": time.time_ns()}

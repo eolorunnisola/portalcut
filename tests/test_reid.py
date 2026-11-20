@@ -228,3 +228,33 @@ def test_undo_only_right_after_a_switch(job_dir):
     sel.answer(3, True)                                  # a later answer
     assert sel.undo() is False                           # undo would silently drop that answer
     assert sel.summary()["confirmed"] == [1, 3]
+
+
+# ---- rebuilt player video must not be served from the browser's cache ----
+
+def test_each_rebuild_gets_a_new_video_version(job_dir):
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=6",
+                    "-c:v", "libx264", "-preset", "ultrafast", str(job_dir / "proxy.mp4")], check=True)
+    sel = reid.Selection(job_dir)
+    sel.answer(0, True)
+    sel.save()
+    first = reid.finish(job_dir, 320, 180)["version"]
+    sel = reid.Selection(job_dir)
+    sel.answer(1, True)                                  # switch players, rebuild
+    sel.save()
+    assert reid.finish(job_dir, 320, 180)["version"] != first
+
+
+def test_generated_media_is_not_cached(job_dir, tmp_db):
+    import shutil
+    shutil.copytree(job_dir, db.DATA_DIR / "nc")
+    (db.DATA_DIR / "nc" / "debug_player.mp4").write_bytes(b"x")
+    (db.DATA_DIR / "nc" / "debug_tracks.mp4").write_bytes(b"x")
+    (db.DATA_DIR / "nc" / "frames").mkdir()
+    (db.DATA_DIR / "nc" / "frames" / "0.jpg").write_bytes(b"x")
+    db.create("nc", "g.mp4")
+    db.update("nc", status="ready", meta={"proxy": {"width": 320, "height": 180}, "features": {"tracks": 6}})
+    c = TestClient(app_mod.app)
+    for url in ("/api/jobs/nc/debug_player", "/api/jobs/nc/debug", "/api/jobs/nc/frames/0"):
+        r = c.get(url)
+        assert r.status_code == 200 and "no-store" in r.headers.get("cache-control", ""), url
