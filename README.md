@@ -58,3 +58,4 @@ Models download once: RF-DETR Medium (~350 MB) to `~/.roboflow/models/`, DINOv2-
 - Tracks break when players cross or leave the frame. Player selection re-links them by appearance.
 - Selection has only been tested on a 1-on-1 clip with two very different jerseys. Teammates in the same jersey are the hard case; the `BAND` threshold in `portalcut/reid.py` will need tuning on a real game.
 - Jersey-number reading (with Claude Haiku) is not built; add it if teammates get confused.
+- Clicking a different player switches the selection (with Undo). A click on someone who only *might* be a different person (similarity within `BAND`) is treated as another sighting of you instead; if that was wrong, click them again in a frame where your player is also boxed to switch.
