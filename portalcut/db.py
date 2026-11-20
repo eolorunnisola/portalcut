@@ -29,6 +29,8 @@ def init() -> None:
                 created_at REAL NOT NULL
             )"""
         )
+        # Building the player view only reads finished tracking, so an interrupted one can simply be redone.
+        c.execute("UPDATE jobs SET status='ready', progress=1 WHERE status='selecting'")
         # A job left mid-ingest by a server restart will never finish; say so instead of spinning forever.
         c.execute(
             "UPDATE jobs SET status='failed', error='interrupted by server restart' "

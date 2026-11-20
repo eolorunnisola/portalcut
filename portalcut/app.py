@@ -132,6 +132,8 @@ def reset_selection(job_id: str):
 def _finish(job_id: str, job_dir: Path) -> None:
     try:
         meta = db.get(job_id)["meta"]
+        if meta.pop("selection", None) is not None:  # never show an old result beside half-rebuilt files
+            db.update(job_id, meta=meta)
         p = meta["proxy"]
         meta["selection"] = reid.finish(job_dir, p["width"], p["height"])
         db.update(job_id, status="ready", progress=1.0, meta=meta)

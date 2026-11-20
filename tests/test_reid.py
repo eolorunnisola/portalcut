@@ -103,3 +103,25 @@ def test_selection_api(job_dir, tmp_db):
 
     db.update(jid, status="tracking")
     assert c.get(f"/api/jobs/{jid}/select").status_code == 409      # not ready yet
+
+
+
+def test_restart_during_selection_keeps_job_usable(tmp_db):
+    db.create("s", "g.mp4")
+    db.update("s", status="selecting")
+    db.create("t", "g.mp4")
+    db.update("t", status="tracking")
+    db.init()                                            # what a server restart does
+    assert db.get("s")["status"] == "ready" and db.get("s")["error"] is None  # tracking is intact: just pick again
+    assert db.get("t")["status"] == "failed"
+
+
+def test_finish_clears_old_result_before_rebuilding(job_dir, tmp_db, monkeypatch):
+    import shutil
+    shutil.copytree(job_dir, db.DATA_DIR / "fx")
+    db.create("fx", "g.mp4")
+    db.update("fx", status="selecting", meta={"proxy": {"width": 320, "height": 180}, "selection": {"old": 1}})
+    monkeypatch.setattr(reid, "finish", lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()))
+    with pytest.raises(KeyboardInterrupt):               # simulate the server dying mid-build
+        app_mod._finish("fx", db.DATA_DIR / "fx")
+    assert "selection" not in db.get("fx")["meta"]       # old result is not shown next to half-written files
