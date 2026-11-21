@@ -20,7 +20,7 @@ from PIL import Image
 from portalcut import track
 
 EMBED_MODEL = "facebook/dinov2-small"  # Apache-2.0, ~90 MB, downloaded once from Hugging Face
-CROPS_PER_TRACK = 4
+CROPS_PER_TRACK = 6
 SELECT_FRAMES = 8
 BAND = 0.04            # margin band treated as uncertain; tune on real games in the eval milestone
 MAX_QUESTIONS = 12
@@ -50,6 +50,14 @@ def embed(images: list[Image.Image], batch: int = 32) -> np.ndarray:
             cls = model(**inputs).last_hidden_state[:, 0]
         out.append(torch.nn.functional.normalize(cls, dim=1).cpu().numpy())
     return np.concatenate(out) if out else np.zeros((0, 384), np.float32)
+
+
+def spread_picks(rows: np.ndarray, frames: np.ndarray, quality: np.ndarray, k: int) -> np.ndarray:
+    """Best row (by quality) from each of k equal time slices of a track. Picking the k best overall took
+    them all from one end, so a piece that swapped players mid-way looked clean (answer key, 84 s)."""
+    order = np.argsort(frames, kind="stable")
+    return np.array([c[np.argmax(q)] for c, q in zip(np.array_split(rows[order], k), np.array_split(quality[order], k))
+                     if len(c)], dtype=rows.dtype)
 
 
 def stripe_flips(img: Image.Image) -> int:
@@ -107,7 +115,7 @@ def build_features(job_dir: Path, w: int, h: int, fps: float = track.SAMPLE_FPS,
     for tid in tids:
         rows = person[t["track_id"][person] == tid]
         area = (t["xyxy"][rows, 2] - t["xyxy"][rows, 0]) * (t["xyxy"][rows, 3] - t["xyxy"][rows, 1])
-        best = rows[np.argsort(-(t["conf"][rows] * area))][:CROPS_PER_TRACK]
+        best = spread_picks(rows, t["frame"][rows], t["conf"][rows] * area, CROPS_PER_TRACK)
         for r in best:
             wanted.setdefault(int(t["frame"][r]), []).append((int(tid), t["xyxy"][r]))
         meta_rows.append((int(tid), int(t["frame"][rows].min()), int(t["frame"][rows].max()), len(rows)))

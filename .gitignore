@@ -7,3 +7,4 @@ __pycache__/
 *.mp4
 *.m4v
 *.mkv
+eval/tracking/*/frames/

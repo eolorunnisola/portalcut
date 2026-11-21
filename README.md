@@ -79,6 +79,35 @@ or in `config` when re-running (`POST /api/jobs/{id}/track`):
 Every distance and speed is labelled with its units. Without calibration they are **estimates in image
 pixels** (screen positions, distorted by camera pans), not real-world measurements.
 
+## Run on Google Colab
+
+Heavy processing (detection, tracking, tracker sweeps) can run on a free or paid Colab GPU instead of this Mac.
+
+1. Open `colab/portalcut_worker.ipynb` in Colab (*File → Open notebook → GitHub*), with a GPU runtime.
+2. Follow its first cell: Drive folders `portalcut/videos`, `portalcut/rosters`, `portalcut/jobs`, and Colab Secrets
+   `GITHUB_TOKEN` (read-only) and optionally `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
+3. Set the options cell and *Run all*. Each video becomes `portalcut/jobs/<job_id>/` on Drive.
+4. Paste the printed **SUMMARY** lines back to Claude. Do not paste videos, `.npz` files or full logs.
+5. To open a job in the local app (Drive for desktop syncing the jobs folder):
+
+```bash
+uv run python -m portalcut.import_job "<Google Drive>/My Drive/portalcut/jobs/<job_id>"
+```
+
+The same tools run anywhere without the web server:
+
+```bash
+uv run python -m portalcut.batch game.mp4 --out jobs/ --set tracker=bytetrack --roster eval/rosters/uconn_arizona.json
+```
+
+```bash
+uv run python scripts/compare_trackers.py jobs/<job_id> eval/tracking/uconn_arizona_clip/key.json
+```
+
+```bash
+uv run python -m portalcut.track_eval jobs/<job_id> eval/tracking/uconn_arizona_clip/key.json
+```
+
 ## Test
 
 ```bash

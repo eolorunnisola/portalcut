@@ -1,0 +1,356 @@
+[
+ {
+  "t": 46.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-3",
+   "Arizona-13",
+   "UConn-18",
+   "UConn-24",
+   "ref",
+   "Arizona-?",
+   "UConn-?",
+   "other"
+  ],
+  "missed": 1,
+  "notes": "bg UConn player unboxed"
+ },
+ {
+  "t": 47.0,
+  "labels": [
+   "UConn-23",
+   "UConn-18",
+   "UConn-3",
+   "Arizona-3",
+   "Arizona-?",
+   "ref",
+   "ref",
+   "Arizona-?",
+   "other",
+   "UConn-5",
+   "Arizona-?"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 48.0,
+  "labels": [
+   "UConn-23",
+   "Arizona-3",
+   "UConn-3",
+   "Arizona-?",
+   "Arizona-?",
+   "ref",
+   "ref",
+   "Arizona-?",
+   "other",
+   "UConn-24",
+   "Arizona-?"
+  ],
+  "missed": 1,
+  "notes": "UConn 5 in bg unboxed"
+ },
+ {
+  "t": 49.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-3",
+   "UConn-?",
+   "Arizona-23",
+   "ref",
+   "ref",
+   "Arizona-?",
+   "UConn-24",
+   "Arizona-?"
+  ],
+  "missed": 2,
+  "notes": "bg UConn5 and Arizona unboxed"
+ },
+ {
+  "t": 50.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-?",
+   "UConn-24",
+   "Arizona-3",
+   "ref",
+   "UConn-5",
+   "Arizona-?",
+   "bad"
+  ],
+  "missed": 2,
+  "notes": "UConn18 jumping unboxed; box7 multi-person"
+ },
+ {
+  "t": 51.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-?",
+   "UConn-18",
+   "Arizona-?",
+   "UConn-24",
+   "Arizona-3",
+   "ref",
+   "Arizona-?",
+   "Arizona-?",
+   "ref"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 52.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-3",
+   "UConn-?",
+   "Arizona-?",
+   "UConn-24",
+   "Arizona-?",
+   "Arizona-?",
+   "UConn-?",
+   "ref",
+   "other",
+   "ref",
+   "UConn-?"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 53.0,
+  "labels": [
+   "Arizona-?",
+   "UConn-?",
+   "Arizona-?",
+   "UConn-3",
+   "Arizona-?",
+   "other",
+   "ref",
+   "Arizona-?",
+   "other",
+   "UConn-?",
+   "other",
+   "UConn-?"
+  ],
+  "missed": 0,
+  "notes": "camera pan"
+ },
+ {
+  "t": 54.0,
+  "labels": [
+   "Arizona-?",
+   "UConn-18",
+   "UConn-?",
+   "UConn-3",
+   "Arizona-?",
+   "other",
+   "ref",
+   "other",
+   "UConn-?",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 55.0,
+  "labels": [
+   "UConn-18",
+   "Arizona-?",
+   "UConn-?",
+   "Arizona-23",
+   "UConn-5",
+   "ref",
+   "other",
+   "UConn-3",
+   "other",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 56.0,
+  "labels": [
+   "UConn-18",
+   "Arizona-23",
+   "UConn-?",
+   "UConn-3",
+   "Arizona-?",
+   "UConn-?",
+   "ref",
+   "UConn-5",
+   "other",
+   "Arizona-?",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 57.0,
+  "labels": [
+   "UConn-18",
+   "UConn-23",
+   "Arizona-23",
+   "UConn-5",
+   "UConn-?",
+   "ref",
+   "Arizona-?",
+   "UConn-?",
+   "other",
+   "Arizona-3",
+   "Arizona-?",
+   "ref",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 58.0,
+  "labels": [
+   "UConn-5",
+   "UConn-18",
+   "UConn-23",
+   "Arizona-23",
+   "Arizona-?",
+   "Arizona-3",
+   "Arizona-?",
+   "ref",
+   "UConn-?",
+   "other",
+   "ref",
+   "UConn-?",
+   "Arizona-?"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 59.0,
+  "labels": [
+   "UConn-5",
+   "UConn-18",
+   "Arizona-23",
+   "Arizona-?",
+   "UConn-23",
+   "UConn-?",
+   "Arizona-3",
+   "Arizona-?",
+   "UConn-?",
+   "ref",
+   "other",
+   "Arizona-?",
+   "ref",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 60.0,
+  "labels": [
+   "UConn-23",
+   "UConn-24",
+   "Arizona-23",
+   "Arizona-3",
+   "ref",
+   "UConn-?",
+   "Arizona-?",
+   "Arizona-?",
+   "bad",
+   "UConn-18",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 61.0,
+  "labels": [
+   "UConn-5",
+   "UConn-23",
+   "Arizona-3",
+   "Arizona-23",
+   "ref",
+   "Arizona-?",
+   "UConn-3",
+   "Arizona-?",
+   "Arizona-?",
+   "other",
+   "ref",
+   "other"
+  ],
+  "missed": 1,
+  "notes": "UConn24 beside shooter unboxed"
+ },
+ {
+  "t": 62.0,
+  "labels": [
+   "UConn-23",
+   "UConn-3",
+   "UConn-?",
+   "UConn-5",
+   "Arizona-23",
+   "Arizona-3",
+   "ref",
+   "UConn-?",
+   "Arizona-?",
+   "Arizona-?",
+   "Arizona-13",
+   "other",
+   "ref",
+   "other",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 63.0,
+  "labels": [
+   "UConn-3",
+   "UConn-24",
+   "Arizona-?",
+   "UConn-?",
+   "UConn-5",
+   "UConn-?",
+   "Arizona-?",
+   "other",
+   "other",
+   "Arizona-?",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 72.0,
+  "labels": [
+   "UConn-5",
+   "UConn-?",
+   "ref",
+   "Arizona-?",
+   "UConn-?",
+   "Arizona-?",
+   "Arizona-?",
+   "Arizona-?",
+   "UConn-?",
+   "other",
+   "UConn-?",
+   "Arizona-?",
+   "other",
+   "ref"
+  ],
+  "missed": 0,
+  "notes": "new scene"
+ }
+]

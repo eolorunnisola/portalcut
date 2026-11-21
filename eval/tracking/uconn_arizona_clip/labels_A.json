@@ -1,0 +1,362 @@
+[
+ {
+  "t": 27.0,
+  "labels": [
+   "UConn-5",
+   "UConn-3",
+   "Arizona-8",
+   "ref",
+   "Arizona-?",
+   "other",
+   "other",
+   "other",
+   "Arizona-3",
+   "other",
+   "ref"
+  ],
+  "missed": 0,
+  "notes": "seated players outside lines = other; Arizona-3 number foreshortened, by continuity"
+ },
+ {
+  "t": 28.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-8",
+   "UConn-5",
+   "Arizona-3",
+   "Arizona-7",
+   "Arizona-?",
+   "ref",
+   "UConn-?",
+   "ref",
+   "UConn-?",
+   "other",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 29.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-8",
+   "UConn-5",
+   "ref",
+   "Arizona-?",
+   "ref",
+   "Arizona-3",
+   "UConn-?",
+   "UConn-?",
+   "other",
+   "other",
+   "Arizona-7",
+   "UConn-?",
+   "bad",
+   "Arizona-?"
+  ],
+  "missed": 0,
+  "notes": "left cluster 12/13/14/7 overlapped"
+ },
+ {
+  "t": 30.0,
+  "labels": [
+   "Arizona-8",
+   "UConn-3",
+   "Arizona-3",
+   "Arizona-13",
+   "UConn-23",
+   "UConn-18",
+   "ref",
+   "ref",
+   "Arizona-7",
+   "Arizona-23",
+   "UConn-5",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 31.0,
+  "labels": [
+   "Arizona-8",
+   "Arizona-13",
+   "UConn-24",
+   "Arizona-3",
+   "UConn-5",
+   "UConn-3",
+   "Arizona-7",
+   "UConn-18",
+   "ref",
+   "ref",
+   "UConn-23",
+   "Arizona-23",
+   "other"
+  ],
+  "missed": 0,
+  "notes": "UConn 23/24 by elimination"
+ },
+ {
+  "t": 32.0,
+  "labels": [
+   "Arizona-8",
+   "UConn-3",
+   "UConn-24",
+   "Arizona-3",
+   "UConn-23",
+   "UConn-5",
+   "ref",
+   "UConn-18",
+   "Arizona-7",
+   "ref",
+   "Arizona-13",
+   "Arizona-23",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 33.0,
+  "labels": [
+   "Arizona-13",
+   "Arizona-7",
+   "UConn-18",
+   "ref",
+   "UConn-23",
+   "UConn-5",
+   "Arizona-23",
+   "Arizona-8",
+   "ref",
+   "Arizona-3",
+   "other",
+   "UConn-24",
+   "ref"
+  ],
+  "missed": 0,
+  "notes": "UConn-3 hidden behind box 7"
+ },
+ {
+  "t": 34.0,
+  "labels": [
+   "Arizona-3",
+   "UConn-18",
+   "UConn-24",
+   "UConn-3",
+   "UConn-23",
+   "ref",
+   "UConn-5",
+   "Arizona-23",
+   "Arizona-7",
+   "ref",
+   "other",
+   "other",
+   "ref",
+   "Arizona-8"
+  ],
+  "missed": 1,
+  "notes": "Arizona-13 torso behind UConn-18 has no box"
+ },
+ {
+  "t": 35.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-3",
+   "Arizona-8",
+   "ref",
+   "Arizona-7",
+   "ref",
+   "UConn-?",
+   "Arizona-23",
+   "ref",
+   "UConn-?",
+   "Arizona-13",
+   "UConn-?",
+   "other",
+   "other"
+  ],
+  "missed": 0,
+  "notes": "scrum at left"
+ },
+ {
+  "t": 36.0,
+  "labels": [
+   "Arizona-3",
+   "UConn-18",
+   "Arizona-13",
+   "UConn-5",
+   "Arizona-23",
+   "UConn-3",
+   "Arizona-8",
+   "Arizona-7",
+   "ref",
+   "ref",
+   "other",
+   "UConn-?"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 37.0,
+  "labels": [
+   "Arizona-3",
+   "Arizona-13",
+   "UConn-3",
+   "UConn-18",
+   "Arizona-8",
+   "Arizona-23",
+   "ref",
+   "bad",
+   "UConn-5",
+   "Arizona-7",
+   "UConn-?",
+   "ref"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 38.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-3",
+   "Arizona-8",
+   "UConn-?",
+   "Arizona-13",
+   "UConn-?",
+   "ref",
+   "UConn-23",
+   "Arizona-23",
+   "Arizona-7",
+   "ref"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 39.0,
+  "labels": [
+   "UConn-3",
+   "Arizona-3",
+   "ref",
+   "UConn-5",
+   "Arizona-7",
+   "Arizona-23",
+   "bad",
+   "ref",
+   "Arizona-13",
+   "UConn-24",
+   "UConn-?",
+   "other"
+  ],
+  "missed": 0,
+  "notes": "scrum"
+ },
+ {
+  "t": 40.0,
+  "labels": [
+   "Arizona-3",
+   "UConn-3",
+   "Arizona-23",
+   "UConn-5",
+   "ref",
+   "UConn-18",
+   "ref",
+   "Arizona-7",
+   "Arizona-13",
+   "UConn-24",
+   "Arizona-8",
+   "other"
+  ],
+  "missed": 0,
+  "notes": ""
+ },
+ {
+  "t": 41.0,
+  "labels": [
+   "UConn-?",
+   "Arizona-13",
+   "Arizona-8",
+   "UConn-24",
+   "UConn-?",
+   "UConn-?",
+   "other",
+   "other",
+   "other"
+  ],
+  "missed": 1,
+  "notes": "Arizona player far right unboxed"
+ },
+ {
+  "t": 42.0,
+  "labels": [
+   "UConn-23",
+   "Arizona-8",
+   "UConn-24",
+   "UConn-?",
+   "Arizona-?",
+   "bad",
+   "other",
+   "Arizona-?"
+  ],
+  "missed": 0,
+  "notes": "box 5 covers two"
+ },
+ {
+  "t": 43.0,
+  "labels": [
+   "Arizona-8",
+   "UConn-24",
+   "Arizona-?",
+   "other",
+   "UConn-?",
+   "UConn-?",
+   "ref",
+   "UConn-?",
+   "Arizona-?",
+   "other"
+  ],
+  "missed": 0,
+  "notes": "seated players at far sideline = other; cluster 4/5/7/8 overlapped"
+ },
+ {
+  "t": 44.0,
+  "labels": [
+   "Arizona-?",
+   "UConn-?",
+   "Arizona-7",
+   "UConn-3",
+   "Arizona-8",
+   "UConn-?",
+   "other",
+   "other",
+   "Arizona-?",
+   "UConn-?",
+   "bad",
+   "UConn-?"
+  ],
+  "missed": 0,
+  "notes": "box 10 ref plus seated people"
+ },
+ {
+  "t": 45.0,
+  "labels": [
+   "Arizona-13",
+   "UConn-3",
+   "UConn-18",
+   "Arizona-8",
+   "Arizona-7",
+   "Arizona-3",
+   "Arizona-23",
+   "ref",
+   "UConn-?",
+   "other",
+   "other"
+  ],
+  "missed": 1,
+  "notes": "UConn player right of box 4 unboxed"
+ }
+]

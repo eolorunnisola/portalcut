@@ -344,3 +344,12 @@ def test_finish_merges_gap_filled_frames(job_dir, monkeypatch):
     p = dict(np.load(job_dir / "player.npz"))
     assert p["frame"].tolist() == sorted(set(p["frame"].tolist()))   # sorted, one box per frame
     assert (p["track_id"] == -2).sum() == 2 and out["gap_filled_frames"] == 2
+
+
+def test_spread_picks_cover_the_whole_track():
+    rows = np.arange(20)
+    frames = np.arange(20)
+    quality = np.r_[np.full(10, 9.0), np.full(10, 1.0)]        # first half much "better" quality
+    picks = reid.spread_picks(rows, frames, quality, 4)
+    assert len(picks) == 4 and picks.max() >= 10              # still samples the second half
+    assert len(reid.spread_picks(rows[:2], frames[:2], quality[:2], 6)) == 2   # short track: no empty slices
