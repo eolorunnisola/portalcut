@@ -70,7 +70,7 @@ def load_numbers(job_dir: Path) -> dict[int, dict]:
     return {int(k): v for k, v in json.loads(f.read_text()).items()} if f.exists() else {}
 
 
-def read_numbers(job_dir: Path, tids: list[int], budget: float = 0.25, client=None) -> dict:
+def read_numbers(job_dir: Path, tids: list[int], budget: float = 1.0, client=None) -> dict:
     job_dir = Path(job_dir)
     numbers = {str(k): v for k, v in load_numbers(job_dir).items()}
     todo = [t for t in tids if str(t) not in numbers and (job_dir / "crops" / f"{t}_torso.jpg").exists()]

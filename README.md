@@ -59,7 +59,7 @@ or in `config` when re-running (`POST /api/jobs/{id}/track`):
 | `lost_seconds` | 1.0 | how long a lost track can be re-found |
 | `tracker_params` | empty | override tuned tracker settings, `name=value,...` (e.g. `enable_cmc=true`) |
 | `annotate_fps` | 10 | annotated video frame rate |
-| `jersey_numbers` | true | read numbers with Claude Haiku (capped at $0.25) |
+| `jersey_numbers` | true | read numbers with Claude Haiku (about $0.02 per 3 minutes, capped at $1 per video) |
 | `gemini`, `gemini_interval_s` | false, 30 | Gemini analysis and its frame sampling |
 
 ### API

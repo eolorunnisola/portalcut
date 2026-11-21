@@ -239,7 +239,7 @@ def _ready_for_selection(job_id: str) -> Path:
     return db.DATA_DIR / job_id
 
 
-NUMBERS_BUDGET = 0.25
+NUMBERS_BUDGET = 1.0
 
 
 def _readable_tracks(sel: reid.Selection) -> list[int]:
