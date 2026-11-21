@@ -214,13 +214,21 @@ class Selection:
         self.index = {int(t): k for k, t in enumerate(self.tids)}
         hist = np.sqrt(f["hist"])  # Bhattacharyya coefficient as a matmul
         self.sim = W_EMB * (f["emb"] @ f["emb"].T) + W_HIST * (hist @ hist.T)
-        self.team = team_clusters(f.get("team_feat", f["hist"]), f["n"])  # older jobs: fall back to hue
+        # team per track by per-crop vote (identity.team_votes); a "mixed" track holds two players (a tracker
+        # swap), so it never sets your team and is never accepted on its jersey number alone
+        from portalcut import identity
+        votes = identity.team_votes(job_dir)
+        self.team = np.array([-1 if votes[int(t)]["team"] is None else votes[int(t)]["team"] for t in self.tids])
+        self.mixed = {int(t) for t in self.tids if votes[int(t)]["mixed"]}
         nf = job_dir / "numbers.json"  # written by portalcut.jersey; None = not readable
         nums = {int(t): v for t, v in (json.loads(nf.read_text()) if nf.exists() else {}).items()
                 if v.get("number") is not None and int(t) in self.index}
         self.number = {t: v["number"] for t, v in nums.items()}
         # one reading can be a misread (18 -> 13) or a tracker identity swap: accepting by number needs two
         self.strong = {t for t, v in nums.items() if v.get("votes", 0) >= 2}
+        rf = job_dir / "roster.json"  # a number on only one roster names the player whatever his colour reads as
+        rosters = [set(t["players"]) for t in json.loads(rf.read_text())["teams"][:2]] if rf.exists() else []
+        self.unique_numbers = {n for r in rosters for n in r if sum(n in q for q in rosters) == 1} if len(rosters) == 2 else set()
 
         tr = track.load(job_dir / "tracks.npz")
         m = tr["cls"] == track.PERSON
@@ -251,14 +259,24 @@ class Selection:
     def target(self) -> tuple[int | None, str | None]:
         """Your team (jersey-colour cluster) and jersey number, by majority over your confirmed tracks."""
         mode = lambda xs: max(set(xs), key=xs.count) if xs else None
-        return (mode([int(self.team[self.index[p]]) for p in self.pos]),
+        clean = [p for p in self.pos if p not in self.mixed and self.team[self.index[p]] >= 0]
+        return (mode([int(self.team[self.index[p]]) for p in clean]),
                 mode([self.number[p] for p in self.pos if p in self.number]))
 
     def _other_player(self, t: int, team: int | None, num: str | None) -> bool:
         """Other team's colours, or a readable number that isn't yours (an unread number never counts).
         Colour wins over a matching number: on real footage a navy #18 was misread as 13. Precision first."""
-        return (team is not None and int(self.team[self.index[t]]) != team) or \
+        if self._number_says_you(t, num):
+            return False
+        return (team is not None and t not in self.mixed and int(self.team[self.index[t]]) not in (-1, team)) or \
             (num is not None and self.number.get(t, num) != num)
+
+    def _number_says_you(self, t: int, num: str | None, team: int | None = None) -> bool:
+        """A clean track read as your number at least twice: enough if only one roster has that number,
+        otherwise (no roster, or both teams have it) only on your known team."""
+        if num is None or t in self.mixed or t not in self.strong or self.number.get(t) != num:
+            return False
+        return num in self.unique_numbers or (team is not None and int(self.team[self.index[t]]) == team)
 
     def _auto_neg(self) -> set[int]:
         """Everyone known not to be you: your No answers, anyone on screen with you, other team, other number."""
@@ -317,8 +335,9 @@ class Selection:
             margin[t] = float(s_pos - s_neg)
 
         # your number on your team is the strongest evidence: accept those first, longest first
-        _, num = self.target()
-        same_number = [t for t in margin if num is not None and self.number.get(t) == num and t in self.strong]
+        # both teams can have the number (UConn and Arizona each have a #23): see _number_says_you
+        team, num = self.target()
+        same_number = [t for t in margin if self._number_says_you(t, num, team)]
         # then accept by margin; never two overlapping tracks: the player is in one place at a time
         accepted = list(self.pos)
         for t in sorted(same_number, key=lambda t: -self.n[self.index[t]]) + \

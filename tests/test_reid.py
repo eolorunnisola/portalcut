@@ -353,3 +353,20 @@ def test_spread_picks_cover_the_whole_track():
     picks = reid.spread_picks(rows, frames, quality, 4)
     assert len(picks) == 4 and picks.max() >= 10              # still samples the second half
     assert len(reid.spread_picks(rows[:2], frames[:2], quality[:2], 6)) == 2   # short track: no empty slices
+
+
+def test_number_needs_team_unless_unique_on_roster():
+    import numpy as np
+    from portalcut.reid import Selection
+    s = object.__new__(Selection)
+    s.tids = np.array([1, 2, 3, 4])
+    s.index = {1: 0, 2: 1, 3: 2, 4: 3}
+    s.team = np.array([0, 1, 1, 1])
+    s.mixed = {4}
+    s.strong = {1, 2, 3, 4}
+    s.number = {1: "23", 2: "23", 3: "24", 4: "24"}
+    s.unique_numbers = {"24"}          # both rosters have a 23; only one has a 24
+    assert s._number_says_you(1, "23", team=0)
+    assert not s._number_says_you(2, "23", team=0)  # the other team's #23
+    assert s._number_says_you(3, "24", team=0)      # unique number: colour doesn't matter
+    assert not s._number_says_you(4, "24", team=0)  # mixed track (a tracker swap): never by number
