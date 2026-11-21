@@ -86,3 +86,11 @@ def test_tracker_params_parse_and_validate():
     assert parse_params("") == {}
     with pytest.raises(ValueError):
         Config.from_dict({"tracker_params": "oops"})
+
+
+def test_botsort_uses_tuned_defaults_and_overrides():
+    from portalcut.track import make_tracker
+    t = make_tracker("botsort", 10, 1.0)
+    assert t.high_conf_det_threshold == 0.5 and t.track_activation_threshold == 0.5
+    assert make_tracker("botsort", 10, 1.0, {"track_activation_threshold": 0.7}).track_activation_threshold == 0.7
+    make_tracker("bytetrack", 10, 1.0)  # BoT-SORT-only settings must not leak into other trackers

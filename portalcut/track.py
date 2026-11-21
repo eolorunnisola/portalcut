@@ -52,15 +52,23 @@ def _batches(it, n):
         yield batch
 
 
+# Measured on the UConn-Arizona answer key (Colab, 2026-11-21): vs the library defaults, BoT-SORT names 51% of
+# labelled players correctly instead of 45% (precision 0.918 vs 0.913), with a third of the swaps, in half the time.
+# high_conf 0.6 dropped real players (recall 0.71 -> 0.82); first-match IoU 0.2 let boxes jump between players;
+# camera-motion compensation changed nothing but cost 70 s per 3 minutes.
+TUNED = {"botsort": {"high_conf_det_threshold": 0.5, "track_activation_threshold": 0.5,
+                     "minimum_iou_threshold_first_assoc": 0.3, "enable_cmc": False}}
+
+
 def make_tracker(name: str, fps: float, lost_seconds: float, params: dict | None = None):
     """ByteTrack, BoT-SORT (adds camera-motion compensation from the frames) or OC-SORT.
-    `params` are passed to the tracker's constructor, e.g. {"track_activation_threshold": 0.5}."""
+    `params` override TUNED and go to the tracker's constructor, e.g. {"enable_cmc": True}."""
     from trackers import BoTSORTTracker, ByteTrackTracker, OCSORTTracker
     # the trackers library counts lost_track_buffer in 30 FPS frames whatever the real rate:
     # passing fps*3 (=15 at 5 fps) meant 0.5 s, so every longer occlusion started a new ID
     buf = round(30 * lost_seconds)
     cls = {"bytetrack": ByteTrackTracker, "botsort": BoTSORTTracker, "ocsort": OCSORTTracker}[name]
-    return cls(frame_rate=fps, lost_track_buffer=buf, **(params or {}))
+    return cls(frame_rate=fps, lost_track_buffer=buf, **(TUNED.get(name, {}) | (params or {})))
 
 
 def detect_all(proxy: Path, w: int, h: int, fps: float, detector, start: float = 0.0, seconds: float | None = None,

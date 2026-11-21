@@ -37,7 +37,7 @@ Open http://localhost:8000, drop in a video, then open the dashboard link on the
 | Stage | Output in `data/<job>/` |
 |---|---|
 | ingest: probe, 720p proxy, audio loudness | `proxy.mp4`, `audio_rms.json` |
-| tracking: RF-DETR (person, ball) + BoT-SORT | `tracks.npz` (frame, time, track ID, class, box, confidence) |
+| tracking: RF-DETR (person, ball) + BoT-SORT (tuned) | `tracks.npz` (frame, time, track ID, class, box, confidence) |
 | features: appearance + jersey-colour per track piece | `features.npz`, crops |
 | numbers: jersey numbers read by Claude Haiku, majority vote | `numbers.json` |
 | identities: team + number links track pieces into players | `identities.json` (`T1-13` = team 1, #13) |
@@ -57,7 +57,7 @@ or in `config` when re-running (`POST /api/jobs/{id}/track`):
 | `person_conf`, `ball_conf` | 0.4, 0.25 | minimum detection confidence |
 | `tracker` | `botsort` | `botsort`, `bytetrack` or `ocsort` |
 | `lost_seconds` | 1.0 | how long a lost track can be re-found |
-| `tracker_params` | empty | extra tracker settings, `name=value,...` (e.g. `high_conf_det_threshold=0.4`) |
+| `tracker_params` | empty | override tuned tracker settings, `name=value,...` (e.g. `enable_cmc=true`) |
 | `annotate_fps` | 10 | annotated video frame rate |
 | `jersey_numbers` | true | read numbers with Claude Haiku (capped at $0.25) |
 | `gemini`, `gemini_interval_s` | false, 30 | Gemini analysis and its frame sampling |
@@ -123,20 +123,18 @@ uv run python -m portalcut.eval <job_id> eval/uconn_arizona_az13.json
 
 ## Measured
 
-Tracker comparison on 3 minutes of a UConn–Arizona broadcast, identical detections for every tracker.
-"Swaps" are track pieces whose jersey colour flips team (about 19% is measurement noise):
+Scored against a hand-labelled answer key (56 keyframes, 487 players) on 3 minutes of a UConn–Arizona
+broadcast, full pipeline on a Colab T4 (`eval/tracking/uconn_arizona_clip/key.json`, `portalcut.track_eval`):
 
-| Detection fps | Tracker | Lost buffer | People kept per frame | Swaps |
-|---|---|---|---|---|
-| 5 | ByteTrack (old setting) | 0.5 s | 6.52 | 37.4% |
-| 5 | ByteTrack | 3 s | 6.73 | 45.8% |
-| 10 | ByteTrack | 0.5 s | 7.17 | 31.7% |
-| 10 | **BoT-SORT (default)** | 1 s | 5.80 | 26.9% |
-| 10 | BoT-SORT | 0.5 s | 5.72 | 24.4% |
-| 10 | OC-SORT | 3 s | 4.55 | 28.8% |
+| Tracker settings | Players found | Track swaps | Named correctly | Names right when given | Tracking |
+|---|---|---|---|---|---|
+| ByteTrack, 1 s | 84% | 49% | 18% | 0.86 | 89 s |
+| BoT-SORT, library defaults | 71% | 25% | 45% | 0.91 | 149 s |
+| **BoT-SORT, tuned (default)** | 82% | 9% | **51%** | **0.92** | 77 s |
 
-Full pipeline on that 3-minute clip (Apple Silicon): tracking 152 s (0.84× real time), 374 track pieces,
-jersey numbers $0.0098, 94 pieces linked into 22 named players, annotated video 11 s, analytics instant.
+Tuned = `high_conf_det_threshold` 0.5, `track_activation_threshold` 0.5, first-match IoU 0.3, no camera-motion
+compensation (`track.TUNED`). ByteTrack finds more players but swaps half its tracks, and a swapped track
+never gets a clear jersey-number majority. Jersey reads cost about $0.02 per 3 minutes.
 
 | Earlier measurements | Result | Cost |
 |---|---|---|

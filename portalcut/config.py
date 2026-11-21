@@ -13,7 +13,7 @@ class Config:
     ball_conf: float = 0.25          # COCO's ball class is weak on basketball; keep low
     tracker: str = "botsort"         # fewest identity swaps measured; "bytetrack" keeps ~20% more detections
     lost_seconds: float = 1.0        # longer buffers re-attach lost IDs to the wrong player; linking repairs gaps
-    tracker_params: str = ""         # extra tracker settings, "name=value,..." (see trackers.BoTSORTTracker)
+    tracker_params: str = ""         # overrides of track.TUNED, "name=value,..." (see trackers.BoTSORTTracker)
     annotate_fps: float = 10.0       # annotated video frame rate (boxes interpolated between detections)
     jersey_numbers: bool = True      # read numbers with Claude Haiku (~$0.03/game, capped at $0.25) to link tracklets
     gemini: bool = False             # optional Gemini Flash analysis after tracking

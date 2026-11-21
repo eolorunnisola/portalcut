@@ -62,11 +62,11 @@ confidence thresholds, tracker, lost-track buffer, annotated-video fps, Gemini o
    labelled `estimated` in pixel units. With 4 known court points a homography converts foot
    positions to metres; broadcast camera motion still makes that approximate (one homography per
    clip), and the output says so.
-6. **Tracker defaults were chosen by measurement**: BoT-SORT, 10 detections/s, 1 s lost buffer.
-   On 3 minutes of broadcast footage with identical detections, it had the fewest cross-team identity
-   swaps (26.9% vs 31.7–45.8% for ByteTrack, with ~19% being colour-measurement noise), at the cost of
-   ~20% fewer kept detections. Longer lost buffers raised swaps: a lost ID gets re-attached to the wrong
-   player. The tracker stays conservative and `identity.py` repairs fragments. Note: the `trackers`
+6. **Tracker defaults were chosen by measurement** against a hand-labelled answer key
+   (`eval/tracking/`, scored by `track_eval.py`): BoT-SORT with `track.TUNED` settings, 10 detections/s,
+   1 s lost buffer. It names 51% of labelled players correctly at 0.92 precision; library defaults 45%,
+   ByteTrack 18% (it finds more players but half its tracks swap people, so jersey votes never agree).
+   Fragments are fine (`identity.py` links them by number); swaps are what break naming. Note: the `trackers`
    library counts `lost_track_buffer` in 30 FPS frames whatever the real rate (`track.make_tracker`).
 7. **Gemini is optional and separate.** It sees sampled frames and tracking summaries only, with
    sampling, retries, structured JSON and cost logging.
