@@ -20,7 +20,7 @@ import uuid
 from pathlib import Path
 
 from portalcut import db, ingest
-from portalcut.config import Config
+from portalcut.config import Config, load_env
 
 SUMMARY_KEYS = ("tracking", "live", "features", "numbers", "identities", "annotated", "analytics", "analysis")
 
@@ -85,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="processing setting, repeatable")
     ap.add_argument("--keep-source", action="store_true", help="also copy the original video into the job folder")
     a = ap.parse_args(argv)
+    load_env()  # ANTHROPIC_API_KEY etc. from .env, as the web app does
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     config = dict(kv.split("=", 1) for kv in a.set)
     results = []

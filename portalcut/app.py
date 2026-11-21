@@ -12,23 +12,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from portalcut import db, events, ingest, jersey, pipeline, reid, track
-from portalcut.config import Config
+from portalcut.config import Config, load_env
 
 ALLOWED_EXT = {".mp4", ".mov", ".m4v", ".mkv"}
 STATIC = Path(__file__).parent / "static"
 
-
-
-def _load_env(path: Path = Path(__file__).resolve().parent.parent / ".env") -> None:
-    """KEY=VALUE lines from .env into the environment; real environment variables win."""
-    if path.exists():
-        for line in path.read_text().splitlines():
-            k, sep, v = line.strip().partition("=")
-            if sep and k and not k.startswith("#"):
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-
-_load_env()
+load_env()
 logging.basicConfig(level=os.environ.get("PORTALCUT_LOG", "INFO"), format="%(asctime)s %(name)s %(levelname)s %(message)s")
 app = FastAPI(title="PortalCut")
 db.init()

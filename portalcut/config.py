@@ -1,6 +1,8 @@
 """Per-job processing settings, stored in the job's meta["config"]."""
 
+import os
 from dataclasses import asdict, dataclass, fields
+from pathlib import Path
 
 TRACKERS = ("bytetrack", "botsort", "ocsort")
 
@@ -61,3 +63,12 @@ def parse_params(text: str) -> dict:
         except ValueError:
             out[k] = {"true": True, "false": False}.get(v.lower(), v)
     return out
+
+
+def load_env(path: Path = Path(__file__).resolve().parent.parent / ".env") -> None:
+    """KEY=VALUE lines from .env into the environment; real environment variables win."""
+    if path.exists():
+        for line in path.read_text().splitlines():
+            k, sep, v = line.strip().partition("=")
+            if sep and k and not k.startswith("#"):
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))

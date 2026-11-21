@@ -227,11 +227,11 @@ def test_restart_while_finding_plays_keeps_job_usable(tmp_db):
 
 
 def test_env_file_is_loaded_but_real_env_wins(tmp_path, monkeypatch):
-    from portalcut import app as app_mod
+    from portalcut.config import load_env
     (tmp_path / ".env").write_text("# comment\nPC_TEST_A='from-file'\nPC_TEST_B=from-file\n")
     monkeypatch.delenv("PC_TEST_A", raising=False)
     monkeypatch.setenv("PC_TEST_B", "real")
-    app_mod._load_env(tmp_path / ".env")
+    load_env(tmp_path / ".env")
     import os
     assert os.environ["PC_TEST_A"] == "from-file" and os.environ["PC_TEST_B"] == "real"
     monkeypatch.delenv("PC_TEST_A")
