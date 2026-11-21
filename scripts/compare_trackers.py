@@ -1,7 +1,10 @@
 """Compare trackers on identical detections against a tracking answer key (ground truth, not a proxy).
 
     python scripts/compare_trackers.py <job_folder> eval/tracking/uconn_arizona_clip/key.json \\
-        --configs bytetrack:0.5 bytetrack:1 botsort:1 ocsort:1 --fps 10
+        --configs bytetrack:1 botsort:1 botsort:1:track_activation_threshold=0.5,high_conf_det_threshold=0.5
+
+Each config is tracker:lost_seconds[:param=value,...]; params go to the tracker's constructor
+(see `trackers.BoTSORTTracker` for names).
 
 <job_folder> is a processed job (has proxy.mp4 and job.json), e.g. from portalcut.batch. Detection runs once
 per fps and is cached in the job folder. Prints one table and a JSON line to paste back to Claude.
@@ -26,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("job", type=Path)
     ap.add_argument("key", type=Path)
     ap.add_argument("--configs", nargs="+", default=["bytetrack:0.5", "bytetrack:1", "botsort:1", "ocsort:1"],
-                    help="tracker:lost_seconds")
+                    help="tracker:lost_seconds[:param=value,...]")
     ap.add_argument("--fps", type=float, default=10.0)
     a = ap.parse_args(argv)
     meta = json.loads((a.job / "job.json").read_text())["meta"]
@@ -41,15 +44,21 @@ def main(argv: list[str] | None = None) -> int:
     print(f"detections: {len(dets)} frames in {time.time() - t0:.0f}s on {det.device}", flush=True)
     rows = []
     for c in a.configs:
-        name, lost = c.split(":")
+        name, lost, *extra = c.split(":")
+        params = {k: _num(v) for k, v in (kv.split("=") for kv in extra[0].split(","))} if extra else {}
         t0 = time.time()
-        r = track.track(proxy, w, h, dur, a.fps, detector=det, tracker=name, lost_seconds=float(lost), detections=dets)
+        r = track.track(proxy, w, h, dur, a.fps, detector=det, tracker=name, lost_seconds=float(lost), detections=dets,
+                        tracker_params=params)
         s = score(key, _cols(r["rows"]), {}, a.fps)
-        rows.append({"tracker": name, "lost_s": float(lost), "fps": a.fps, "tracks": r["stats"]["tracks"],
+        rows.append({"tracker": name, "lost_s": float(lost), "params": params, "fps": a.fps, "tracks": r["stats"]["tracks"],
                      **{m: s[m] for m in METRICS}, "seconds": round(time.time() - t0, 1)})
         print(" ".join(f"{k}={v}" for k, v in rows[-1].items()), flush=True)
     print("\n=== SUMMARY (paste this back to Claude) ===\n" + json.dumps(rows, separators=(",", ":")))
     return 0
+
+
+def _num(v: str):
+    return {"true": True, "false": False}.get(v.lower(), v) if not v.replace(".", "", 1).isdigit() else float(v)
 
 
 def _cols(rows):

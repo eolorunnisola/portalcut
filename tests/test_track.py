@@ -70,3 +70,9 @@ def test_retrack_rules(tmp_db):
     db.update("raw", status="failed")
     assert client.post("/api/jobs/raw/track").status_code == 409  # never ingested
     assert client.post("/api/jobs/nope/track").status_code == 404
+
+
+def test_make_tracker_passes_params():
+    from portalcut.track import make_tracker
+    t = make_tracker("botsort", 10, 1.0, {"track_activation_threshold": 0.45, "enable_cmc": False})
+    assert t.track_activation_threshold == 0.45

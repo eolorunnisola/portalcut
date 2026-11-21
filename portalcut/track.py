@@ -52,14 +52,15 @@ def _batches(it, n):
         yield batch
 
 
-def make_tracker(name: str, fps: float, lost_seconds: float):
-    """ByteTrack, BoT-SORT (adds camera-motion compensation from the frames) or OC-SORT."""
+def make_tracker(name: str, fps: float, lost_seconds: float, params: dict | None = None):
+    """ByteTrack, BoT-SORT (adds camera-motion compensation from the frames) or OC-SORT.
+    `params` are passed to the tracker's constructor, e.g. {"track_activation_threshold": 0.5}."""
     from trackers import BoTSORTTracker, ByteTrackTracker, OCSORTTracker
     # the trackers library counts lost_track_buffer in 30 FPS frames whatever the real rate:
     # passing fps*3 (=15 at 5 fps) meant 0.5 s, so every longer occlusion started a new ID
     buf = round(30 * lost_seconds)
     cls = {"bytetrack": ByteTrackTracker, "botsort": BoTSORTTracker, "ocsort": OCSORTTracker}[name]
-    return cls(frame_rate=fps, lost_track_buffer=buf)
+    return cls(frame_rate=fps, lost_track_buffer=buf, **(params or {}))
 
 
 def detect_all(proxy: Path, w: int, h: int, fps: float, detector, start: float = 0.0, seconds: float | None = None,
@@ -75,13 +76,13 @@ def detect_all(proxy: Path, w: int, h: int, fps: float, detector, start: float =
 
 def track(proxy: Path, w: int, h: int, duration: float, fps: float = SAMPLE_FPS, on_progress=lambda p: None,
           detector=None, tracker: str = "bytetrack", lost_seconds: float = 3.0, detections: list | None = None,
-          start: float = 0.0, seconds: float | None = None) -> dict:
+          start: float = 0.0, seconds: float | None = None, tracker_params: dict | None = None) -> dict:
     """Detect (unless `detections` are given) and track. Frames are always decoded: BoT-SORT needs them."""
     import supervision as sv
     from portalcut.detect import RFDETRDetector
 
     detector = detector or RFDETRDetector(PERSON_CONF, BALL_CONF)
-    trk = make_tracker(tracker, fps, lost_seconds)
+    trk = make_tracker(tracker, fps, lost_seconds, tracker_params)
     span = seconds or (duration - start)
     total = max(1, int(span * fps))
     rows = []  # (frame, t, track_id, cls, x1, y1, x2, y2, conf)
