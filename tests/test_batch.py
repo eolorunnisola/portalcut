@@ -40,3 +40,9 @@ def test_batch_rejects_bad_setting(clip, tmp_path):
     with pytest.raises(Exception):
         batch.run(clip, tmp_path / "out", {"tracker": "nope"})
     assert not (tmp_path / "out").exists()
+
+
+def test_batch_missing_video(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        batch.run(tmp_path / "nope.mov", tmp_path / "out", {})
+    assert not (tmp_path / "out").exists()

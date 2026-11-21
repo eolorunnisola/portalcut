@@ -44,6 +44,8 @@ def _report_progress(job_id: str, stop: threading.Event, every_s: float = 30.0) 
 def run(video: Path, out_dir: Path, config: dict, roster: Path | None = None, work_dir: Path | None = None,
         keep_source: bool = False) -> dict:
     video, out_dir = Path(video).resolve(), Path(out_dir)
+    if not video.is_file():
+        raise FileNotFoundError(f"no video at {video}")
     work = Path(work_dir or out_dir)
     cfg = Config.from_dict(config)  # validate before spending any time
     db.DATA_DIR, db.DB_PATH = work, work / "portalcut.db"
