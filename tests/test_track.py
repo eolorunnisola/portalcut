@@ -76,3 +76,13 @@ def test_make_tracker_passes_params():
     from portalcut.track import make_tracker
     t = make_tracker("botsort", 10, 1.0, {"track_activation_threshold": 0.45, "enable_cmc": False})
     assert t.track_activation_threshold == 0.45
+
+
+def test_tracker_params_parse_and_validate():
+    import pytest
+    from portalcut.config import Config, parse_params
+    assert parse_params("high_conf_det_threshold=0.4, enable_cmc=false,cmc_method=orb") == \
+        {"high_conf_det_threshold": 0.4, "enable_cmc": False, "cmc_method": "orb"}
+    assert parse_params("") == {}
+    with pytest.raises(ValueError):
+        Config.from_dict({"tracker_params": "oops"})

@@ -13,6 +13,7 @@ class Config:
     ball_conf: float = 0.25          # COCO's ball class is weak on basketball; keep low
     tracker: str = "botsort"         # fewest identity swaps measured; "bytetrack" keeps ~20% more detections
     lost_seconds: float = 1.0        # longer buffers re-attach lost IDs to the wrong player; linking repairs gaps
+    tracker_params: str = ""         # extra tracker settings, "name=value,..." (see trackers.BoTSORTTracker)
     annotate_fps: float = 10.0       # annotated video frame rate (boxes interpolated between detections)
     jersey_numbers: bool = True      # read numbers with Claude Haiku (~$0.03/game, capped at $0.25) to link tracklets
     gemini: bool = False             # optional Gemini Flash analysis after tracking
@@ -30,6 +31,7 @@ class Config:
             raise ValueError(f"tracker must be one of {TRACKERS}")
         if not 0 < self.lost_seconds <= 30 or not 1 <= self.annotate_fps <= 30 or self.gemini_interval_s < 5:
             raise ValueError("lost_seconds 0-30, annotate_fps 1-30, gemini_interval_s >= 5")
+        parse_params(self.tracker_params)  # raises on a malformed string
 
     @classmethod
     def from_dict(cls, d: dict | None) -> "Config":
@@ -45,3 +47,17 @@ class Config:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def parse_params(text: str) -> dict:
+    """"a=0.4,b=false,c=orb" -> {"a": 0.4, "b": False, "c": "orb"}."""
+    out = {}
+    for kv in filter(None, (x.strip() for x in text.split(","))):
+        k, sep, v = kv.partition("=")
+        if not sep or not k.isidentifier():
+            raise ValueError(f"tracker_params: expected name=value, got {kv!r}")
+        try:
+            out[k] = float(v)
+        except ValueError:
+            out[k] = {"true": True, "false": False}.get(v.lower(), v)
+    return out

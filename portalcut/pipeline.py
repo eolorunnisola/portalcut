@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 
 from portalcut import db, track
-from portalcut.config import Config
+from portalcut.config import Config, parse_params
 
 log = logging.getLogger("portalcut.pipeline")
 STAGES = ("tracking", "live", "features", "numbers", "identities", "annotating", "analytics", "analysis")
@@ -48,7 +48,8 @@ def _run(job_id: str, job_dir: Path, start_stage: str) -> None:
                 from portalcut.detect import RFDETRDetector
                 res = track.track(proxy, w, h, p["duration_sec"], cfg.detect_fps, progress,
                                   detector=RFDETRDetector(cfg.person_conf, cfg.ball_conf),
-                                  tracker=cfg.tracker, lost_seconds=cfg.lost_seconds)
+                                  tracker=cfg.tracker, lost_seconds=cfg.lost_seconds,
+                                  tracker_params=parse_params(cfg.tracker_params))
                 track.save(res["rows"], job_dir / "tracks.npz")
                 for name in INVALIDATED_BY_TRACKING:  # new track IDs make all of these stale
                     (job_dir / name).unlink(missing_ok=True)

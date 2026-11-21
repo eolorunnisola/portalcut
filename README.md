@@ -57,6 +57,7 @@ or in `config` when re-running (`POST /api/jobs/{id}/track`):
 | `person_conf`, `ball_conf` | 0.4, 0.25 | minimum detection confidence |
 | `tracker` | `botsort` | `botsort`, `bytetrack` or `ocsort` |
 | `lost_seconds` | 1.0 | how long a lost track can be re-found |
+| `tracker_params` | empty | extra tracker settings, `name=value,...` (e.g. `high_conf_det_threshold=0.4`) |
 | `annotate_fps` | 10 | annotated video frame rate |
 | `jersey_numbers` | true | read numbers with Claude Haiku (capped at $0.25) |
 | `gemini`, `gemini_interval_s` | false, 30 | Gemini analysis and its frame sampling |

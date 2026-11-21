@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 from portalcut import track
+from portalcut.config import parse_params
 from portalcut.detect import RFDETRDetector
 from portalcut.track_eval import score
 
@@ -45,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     rows = []
     for c in a.configs:
         name, lost, *extra = c.split(":")
-        params = {k: _num(v) for k, v in (kv.split("=") for kv in extra[0].split(","))} if extra else {}
+        params = parse_params(extra[0]) if extra else {}
         t0 = time.time()
         r = track.track(proxy, w, h, dur, a.fps, detector=det, tracker=name, lost_seconds=float(lost), detections=dets,
                         tracker_params=params)
@@ -55,10 +56,6 @@ def main(argv: list[str] | None = None) -> int:
         print(" ".join(f"{k}={v}" for k, v in rows[-1].items()), flush=True)
     print("\n=== SUMMARY (paste this back to Claude) ===\n" + json.dumps(rows, separators=(",", ":")))
     return 0
-
-
-def _num(v: str):
-    return {"true": True, "false": False}.get(v.lower(), v) if not v.replace(".", "", 1).isdigit() else float(v)
 
 
 def _cols(rows):
